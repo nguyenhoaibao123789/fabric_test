@@ -1,0 +1,43 @@
+# profiles.yml — dbt-fabric connection profiles
+# ===============================================
+# Authentication uses a service principal.
+# Set these environment variables before running dbt:
+#   AZURE_TENANT_ID       — Azure AD tenant ID
+#   AZURE_CLIENT_ID       — service principal app ID
+#   AZURE_CLIENT_SECRET   — service principal secret
+#   DBT_WAREHOUSE_SERVER  — e.g. <workspace-id>.datawarehouse.fabric.microsoft.com
+#
+# IMPORTANT: Never commit real credentials to this file.
+
+fabric_medallion:
+  target: dev
+  outputs:
+    dev:
+      type: fabric
+      driver: "ODBC Driver 18 for SQL Server"
+      server: "{{ env_var('DBT_WAREHOUSE_SERVER') }}"
+      port: 1433
+      database: gold_warehouse
+      schema: gold
+      authentication: serviceprincipal
+      tenant_id: "{{ env_var('AZURE_TENANT_ID') }}"
+      client_id: "{{ env_var('AZURE_CLIENT_ID') }}"
+      client_secret: "{{ env_var('AZURE_CLIENT_SECRET') }}"
+      encrypt: true
+      trust_cert: false
+      connect_timeout: 30
+
+    prod:
+      type: fabric
+      driver: "ODBC Driver 18 for SQL Server"
+      server: "{{ env_var('DBT_WAREHOUSE_SERVER') }}"
+      port: 1433
+      database: gold_warehouse
+      schema: gold
+      authentication: serviceprincipal
+      tenant_id: "{{ env_var('AZURE_TENANT_ID') }}"
+      client_id: "{{ env_var('AZURE_CLIENT_ID') }}"
+      client_secret: "{{ env_var('AZURE_CLIENT_SECRET') }}"
+      encrypt: true
+      trust_cert: false
+      connect_timeout: 30

@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: dim_carrier
+    description: Carrier dimension — one row per carrier code.
+    columns:
+      - name: carrier_code
+        description: Natural key — carrier identifier (e.g. FEDEX, DHL)
+        tests:
+          - unique
+          - not_null
+      - name: is_active
+        tests:
+          - not_null
+
+  - name: dim_service_type
+    description: Service type dimension — one row per (carrier, service level).
+    columns:
+      - name: carrier_code
+        tests:
+          - not_null
+      - name: service_code
+        tests:
+          - not_null
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [carrier_code, service_code]
+
+  - name: dim_date
+    description: Date dimension — one row per calendar date present in invoices.
+    columns:
+      - name: date_key
+        description: YYYYMMDD integer primary key
+        tests:
+          - unique
+          - not_null
+      - name: full_date
+        tests:
+          - not_null
+
+  - name: fact_invoice
+    description: >
+      Invoice fact table — one row per invoice line, merged on
+      (invoice_number, carrier_key). Foreign keys reference dim tables.
+    columns:
+      - name: invoice_number
+        tests:
+          - not_null
+      - name: carrier_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_carrier')
+              field: carrier_key

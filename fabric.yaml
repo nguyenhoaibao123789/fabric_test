@@ -1,0 +1,53 @@
+# fabric.yaml — Fabric Medallion Pipeline Project Config
+# =======================================================
+# Consumed by deploy.py (artefact deployment) and CI/CD.
+# Infrastructure is managed by Terraform — see terraform/.
+
+project:
+  name: fabric-medallion
+  description: "Carrier invoice data pipeline — Bronze → Silver1 → Silver2 → Gold"
+  version: "1.0.0"
+
+# ── Per-environment settings ─────────────────────────────────────────────────
+# teams_webhook_url: Incoming Webhook URL for failure alerts (optional)
+
+environments:
+  dev:
+    airflow_env_name: "fabric-airflow-dev"
+    spark_env_name:   "medallion-env-dev"
+    teams_webhook_url: ""                     # Optional — Teams channel webhook
+
+  prod:
+    airflow_env_name: "medallion-airflow-prod"
+    spark_env_name:   "medallion-env-prod"
+    teams_webhook_url: ""
+
+# ── Notebook layout ──────────────────────────────────────────────────────────
+# Maps logical notebook names to their source paths (relative to repo root).
+# deploy.py reads this to know what to upload.
+
+notebooks:
+  shared_functions:       fabric/notebooks/shared/shared_functions.ipynb
+  ingest_file:            fabric/notebooks/bronze/ingest_file.ipynb
+  process_invoice:        fabric/notebooks/silver1/process_invoice.ipynb
+  build_carrier_invoice:  fabric/notebooks/silver2/build_carrier_invoice.ipynb
+
+# ── dbt Gold layer ────────────────────────────────────────────────────────────
+dbt_project: dbt/
+
+# ── DAG layout ───────────────────────────────────────────────────────────────
+dag_files:
+  - fabric/dags/medallion_pipeline.py
+  - fabric/dags/callbacks.py
+
+# ── SQL layout ───────────────────────────────────────────────────────────────
+sql_files:
+  - fabric/warehouse/sql/create_tables.sql
+
+# ── Config files ─────────────────────────────────────────────────────────────
+config_files:
+  dev:  config/dev.json
+  prod: config/prod.json
+
+sources_file:   config/sources.json
+schedules_file: config/schedules.json

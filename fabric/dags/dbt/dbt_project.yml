@@ -1,0 +1,27 @@
+# dbt_project.yml — Fabric Gold Layer
+# =====================================
+# Manages Silver → Gold transformations via the dbt-fabric adapter.
+# Tables are pre-created by deploy.py (create_tables.sql) with IDENTITY
+# primary keys. dbt uses incremental merge on natural keys; IDENTITY
+# columns are auto-assigned by SQL Server on insert.
+#
+# Usage:
+#   dbt deps                          # install packages
+#   dbt run  --profiles-dir . --target dev
+#   dbt test --profiles-dir . --target dev
+
+name: medallion_gold
+version: "1.0.0"
+profile: fabric_medallion
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  medallion_gold:
+    gold:
+      +materialized: incremental
+      +incremental_strategy: merge
+      +on_schema_change: ignore      # tables pre-created by DDL — never alter
+      +schema: gold

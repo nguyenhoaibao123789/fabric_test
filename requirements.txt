@@ -1,0 +1,19 @@
+# Local development dependencies
+# These run on your machine, not on Fabric Spark.
+#
+# Setup:
+#   python -m venv .venv
+#   .venv\Scripts\activate        # Windows
+#   source .venv/bin/activate     # Mac/Linux
+#   pip install -r requirements.txt
+
+# deploy.py — Fabric REST API calls
+azure-identity
+requests
+pyyaml
+
+# Notebook git hygiene — strips outputs/execution counts before commit
+nbstripout
+
+# Optional: run dbt locally against Fabric Gold Warehouse
+# dbt-fabric

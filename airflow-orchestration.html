@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fabric Managed Airflow — Orchestration Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font:'IBM Plex Sans',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --bg:#f8f7f4; --bg2:#f0ede8; --bg3:#e8e4de;
+  --tx:#1c1b18; --tx2:#5c5a54; --tx3:#9c9a92;
+  --bd:rgba(0,0,0,.10); --bd2:rgba(0,0,0,.18);
+  --blue:#1565a8;   --blue-bg:#deeefa;  --blue-tx:#0c3f72;  --blue-lt:#e8f4ff;
+  --amber:#7a4500;  --amber-bg:#faebd4; --amber-tx:#4d2c00; --amber-str:#b36900;
+  --teal:#0a6647;   --teal-bg:#d6f2e8;  --teal-tx:#073d2a;  --teal-str:#18916a;
+  --purple:#4a40b0; --purple-bg:#eae8fd;--purple-tx:#302880; --purple-str:#7268d4;
+  --green:#35600e;  --green-bg:#e4f2d4; --green-tx:#1e3a08; --green-str:#5c8f1e;
+  --red:#8b1a1a;    --red-bg:#fde8e8;   --red-tx:#5c0f0f;   --red-str:#c0392b;
+  --gray:#5a5850;   --gray-bg:#ece9e2;  --gray-tx:#3a3830;
+  --shadow-sm:0 2px 8px rgba(0,0,0,.07);
+  --shadow:0 4px 24px rgba(0,0,0,.10);
+  --shadow-lg:0 12px 48px rgba(0,0,0,.14);
+  --r:12px; --rsm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;overflow-x:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);font-size:14px}
+
+/* ─── NAV ─────────────────────────────── */
+#nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;height:52px;
+  background:rgba(248,247,244,.92);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:space-between;padding:0 36px;
+}
+#nav-logo{font-size:13px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:10px;}
+#nav-logo span{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);}
+#nav-links{display:flex;gap:4px}
+.nl{
+  padding:5px 13px;border-radius:6px;font-size:12px;font-weight:500;color:var(--tx2);
+  cursor:pointer;transition:background .15s,color .15s;border:none;background:transparent;
+  font-family:var(--font);text-decoration:none;
+}
+.nl:hover,.nl.active{background:var(--bg3);color:var(--tx)}
+#nav-badge{
+  font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:4px 10px;border-radius:20px;background:var(--purple-bg);color:var(--purple-tx);
+  border:1px solid rgba(74,64,176,.2);
+}
+
+/* ─── DOTS ────────────────────────────── */
+#dots{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:99;display:flex;flex-direction:column;gap:10px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--tx3);opacity:.35;cursor:pointer;transition:opacity .2s,transform .2s,background .2s;border:none;}
+.dot:hover{opacity:.7;transform:scale(1.3)}
+.dot.active{opacity:1;background:var(--purple-str);transform:scale(1.25)}
+
+/* ─── SECTIONS ────────────────────────── */
+section{min-height:100vh;padding:88px 64px 64px;display:flex;flex-direction:column;justify-content:center;position:relative;}
+.s-eyebrow{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);margin-bottom:12px;}
+.s-title{font-size:42px;font-weight:700;letter-spacing:-.8px;line-height:1.15;color:var(--tx);margin-bottom:16px;max-width:820px;}
+.s-title em{font-style:normal;color:var(--purple-str)}
+.s-sub{font-size:17px;font-weight:400;color:var(--tx2);line-height:1.65;max-width:680px;margin-bottom:40px;}
+.s-num{position:absolute;bottom:36px;right:64px;font-size:72px;font-weight:700;color:var(--bd2);font-family:var(--mono);letter-spacing:-2px;pointer-events:none;user-select:none;}
+
+/* ─── S1: COVER ───────────────────────── */
+#s1{background:linear-gradient(135deg,#f0ebff 0%,var(--bg) 55%,#f0fff8 100%)}
+#s1 .s-title{font-size:50px}
+.cover-stats{display:flex;gap:24px;flex-wrap:wrap;margin-top:8px}
+.stat-card{padding:20px 28px;border-radius:var(--r);border:1.5px solid var(--bd2);background:rgba(255,255,255,.6);backdrop-filter:blur(4px);text-align:center;min-width:130px;}
+.stat-num{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1}
+.stat-num.purple{color:var(--purple-str)}
+.stat-num.teal{color:var(--teal-str)}
+.stat-num.amber{color:var(--amber-str)}
+.stat-num.blue{color:var(--blue)}
+.stat-label{font-size:11px;color:var(--tx3);font-weight:600;letter-spacing:.04em;margin-top:5px;text-transform:uppercase}
+.cover-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:20px;background:var(--purple-bg);color:var(--purple-tx);border:1.5px solid rgba(74,64,176,.3);font-size:12px;font-weight:600;margin-top:36px;}
+
+/* ─── S2: DAG VISUALIZATION ───────────── */
+#s2{background:var(--bg2);padding-bottom:80px}
+.dag-wrapper{
+  background:white;border-radius:16px;border:1.5px solid var(--bd2);
+  box-shadow:var(--shadow-lg);overflow:hidden;max-width:960px;margin-top:8px;
+}
+.dag-toolbar{
+  display:flex;align-items:center;gap:12px;padding:14px 20px;
+  border-bottom:1px solid var(--bd);background:var(--bg);flex-wrap:wrap;
+}
+.dag-toolbar-title{font-size:12px;font-weight:700;color:var(--tx2);margin-right:8px;font-family:var(--mono);}
+.btn{
+  padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
+  border:1.5px solid;cursor:pointer;font-family:var(--font);transition:all .15s;
+}
+.btn-run{background:var(--green-bg);color:var(--green-tx);border-color:var(--green-str);}
+.btn-run:hover{background:var(--green-str);color:white}
+.btn-fail{background:var(--red-bg);color:var(--red-tx);border-color:var(--red-str);}
+.btn-fail:hover{background:var(--red-str);color:white}
+.btn-reset{background:var(--gray-bg);color:var(--gray-tx);border-color:var(--bd2);}
+.btn-reset:hover{background:var(--bg3)}
+.btn-rerun{background:var(--amber-bg);color:var(--amber-tx);border-color:var(--amber-str);display:none;}
+.btn-rerun:hover{background:var(--amber-str);color:white}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.dag-status-msg{font-size:11px;color:var(--tx3);font-family:var(--mono);margin-left:auto;}
+
+.dag-canvas{position:relative;width:100%;height:430px;background:#fafaf8;overflow:hidden;}
+.dag-dag-label{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);background:var(--bg);border:1px solid var(--bd2);padding:3px 10px;border-radius:20px;pointer-events:none;white-space:nowrap;}
+#dag-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+
+/* Task Nodes */
+.t-node{
+  position:absolute;border-radius:10px;border:2px solid;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;cursor:default;transition:all .3s ease;
+  padding:6px 8px;user-select:none;
+}
+.t-node .t-label{font-size:11px;font-weight:700;font-family:var(--mono);line-height:1.3;}
+.t-node .t-layer{font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.7;margin-top:2px;}
+.t-node .t-state{font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-top:3px;padding:1px 6px;border-radius:10px;}
+
+/* States */
+.state-pending{background:#f5f4f2;border-color:#d0cec8;color:var(--tx3);}
+.state-pending .t-state{background:#e8e4de;color:var(--tx3);}
+.state-running{background:var(--blue-lt);border-color:var(--blue);color:var(--blue-tx);animation:pulse-blue 1.2s infinite;}
+.state-running .t-state{background:var(--blue-bg);color:var(--blue-tx);}
+.state-success{background:var(--green-bg);border-color:var(--green-str);color:var(--green-tx);}
+.state-success .t-state{background:#c8e8b0;color:var(--green-tx);}
+.state-failed{background:var(--red-bg);border-color:var(--red-str);color:var(--red-tx);animation:shake .4s ease;}
+.state-failed .t-state{background:#f8c8c8;color:var(--red-tx);}
+.state-retrying{background:var(--amber-bg);border-color:var(--amber-str);color:var(--amber-tx);animation:pulse-amber 1s infinite;}
+.state-retrying .t-state{background:#f0d8a8;color:var(--amber-tx);}
+.state-upstream_failed{background:#f5f4f2;border-color:#c0bdb6;border-style:dashed;color:#aaa8a0;}
+.state-upstream_failed .t-state{background:#e8e4de;color:#aaa8a0;}
+
+@keyframes pulse-blue{0%,100%{box-shadow:0 0 0 0 rgba(21,101,168,.4)}50%{box-shadow:0 0 0 6px rgba(21,101,168,0)}}
+@keyframes pulse-amber{0%,100%{box-shadow:0 0 0 0 rgba(179,105,0,.4)}50%{box-shadow:0 0 0 6px rgba(179,105,0,0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+/* Layer badges */
+.layer-bronze{background:var(--amber-bg);border-color:var(--amber-str);color:var(--amber-tx);}
+.layer-bronze.state-running{background:#fff0d8;border-color:var(--amber-str);animation:pulse-amber 1.2s infinite;}
+.layer-bronze.state-success{background:var(--green-bg);border-color:var(--green-str);color:var(--green-tx);}
+.layer-bronze.state-pending{background:#fdf5e8;border-color:#e0c890;color:#7a5e20;}
+.layer-bronze.state-failed{background:var(--red-bg);border-color:var(--red-str);color:var(--red-tx);animation:shake .4s ease;}
+.layer-bronze.state-retrying{background:#fff3e0;border-color:var(--amber-str);color:var(--amber-tx);animation:pulse-amber 1s infinite;}
+.layer-bronze.state-upstream_failed{background:#fdf5e8;border-color:#d4b870;border-style:dashed;color:#b09040;}
+
+.layer-silver1{background:var(--blue-lt);border-color:#7ab0e0;color:#1a4a80;}
+.layer-silver1.state-running{background:var(--blue-lt);border-color:var(--blue);animation:pulse-blue 1.2s infinite;}
+.layer-silver1.state-success{background:var(--green-bg);border-color:var(--green-str);color:var(--green-tx);}
+.layer-silver1.state-pending{background:#ecf4fe;border-color:#90b8e0;color:#2a5888;}
+.layer-silver1.state-failed{background:var(--red-bg);border-color:var(--red-str);color:var(--red-tx);animation:shake .4s ease;}
+.layer-silver1.state-upstream_failed{background:#ecf4fe;border-color:#90b8e0;border-style:dashed;color:#80a0c0;}
+
+.layer-silver2{background:var(--purple-bg);border-color:var(--purple-str);color:var(--purple-tx);}
+.layer-silver2.state-running{background:var(--purple-bg);border-color:var(--purple);animation:pulse-blue 1.2s infinite;}
+.layer-silver2.state-success{background:var(--green-bg);border-color:var(--green-str);color:var(--green-tx);}
+.layer-silver2.state-pending{background:#f0effe;border-color:#b0a8e8;color:#403880;}
+.layer-silver2.state-upstream_failed{background:#f0effe;border-color:#b0a8e8;border-style:dashed;color:#9890c0;}
+
+.layer-gold{background:#fff8e0;border-color:#d4a820;color:#7a5800;}
+.layer-gold.state-running{background:#fff8e0;border-color:#d4a820;animation:pulse-amber 1.2s infinite;}
+.layer-gold.state-success{background:var(--green-bg);border-color:var(--green-str);color:var(--green-tx);}
+.layer-gold.state-pending{background:#fff8e0;border-color:#d4a820;color:#9a7020;}
+.layer-gold.state-upstream_failed{background:#fff8e0;border-color:#d4a820;border-style:dashed;color:#c0a060;}
+
+/* ─── Legend ─────────────────────────── */
+.dag-legend{display:flex;gap:16px;padding:12px 20px;border-top:1px solid var(--bd);flex-wrap:wrap;background:var(--bg);}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--tx2);}
+.leg-dot{width:10px;height:10px;border-radius:3px;border:1.5px solid;}
+.leg-pending{background:#f5f4f2;border-color:#d0cec8;}
+.leg-running{background:var(--blue-lt);border-color:var(--blue);}
+.leg-success{background:var(--green-bg);border-color:var(--green-str);}
+.leg-failed{background:var(--red-bg);border-color:var(--red-str);}
+.leg-retrying{background:var(--amber-bg);border-color:var(--amber-str);}
+.leg-upfail{background:#f5f4f2;border-color:#c0bdb6;border-style:dashed;}
+
+/* ─── S3: DEPENDENCY RESOLUTION ─────── */
+#s3{background:var(--bg)}
+.dep-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:960px;margin-top:8px;}
+.dep-card{padding:28px;border-radius:var(--r);border:1.5px solid var(--bd2);background:white;box-shadow:var(--shadow-sm);}
+.dep-card-title{font-size:15px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.dep-card-sub{font-size:12px;color:var(--tx2);line-height:1.6;margin-bottom:16px;}
+.code-block{background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-family:var(--mono);font-size:11.5px;line-height:1.8;overflow-x:auto;white-space:pre;}
+.code-block .c-comment{color:#6c7086}
+.code-block .c-keyword{color:#cba6f7}
+.code-block .c-string{color:#a6e3a1}
+.code-block .c-func{color:#89b4fa}
+.code-block .c-op{color:#f38ba8}
+.code-block .c-var{color:#fab387}
+.dep-rule{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--bg2);font-size:12px;color:var(--tx2);line-height:1.5;}
+.dep-rule:last-child{border-bottom:none}
+.dep-rule-icon{flex-shrink:0;width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;}
+
+/* ─── S4: ERROR HANDLING ─────────────── */
+#s4{background:var(--bg2)}
+.err-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:960px;margin-top:8px;}
+.err-card{padding:24px;border-radius:var(--r);border:1.5px solid var(--bd2);background:white;box-shadow:var(--shadow-sm);transition:transform .2s,box-shadow .2s;}
+.err-card:hover{transform:translateY(-3px);box-shadow:var(--shadow);}
+.err-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:14px;}
+.err-title{font-size:15px;font-weight:700;margin-bottom:6px;letter-spacing:-.2px;}
+.err-body{font-size:12px;color:var(--tx2);line-height:1.7;margin-bottom:12px;}
+.err-code{padding:10px 12px;border-radius:6px;background:#1e1e2e;color:#cdd6f4;font-family:var(--mono);font-size:11px;line-height:1.7;white-space:pre;}
+.err-code .c-comment{color:#6c7086}
+.err-code .c-keyword{color:#cba6f7}
+.err-code .c-string{color:#a6e3a1}
+.err-code .c-func{color:#89b4fa}
+.err-code .c-var{color:#fab387}
+.err-code .c-num{color:#f9e2af}
+
+/* ─── S5: PYTHON DAG CODE ─────────────── */
+#s5{background:var(--bg)}
+.code-full{background:#1e1e2e;color:#cdd6f4;padding:28px;border-radius:var(--r);font-family:var(--mono);font-size:12px;line-height:1.9;overflow-x:auto;max-width:900px;box-shadow:var(--shadow-lg);border:1px solid #313244;white-space:pre;}
+.code-full .c-comment{color:#6c7086}
+.code-full .c-keyword{color:#cba6f7}
+.code-full .c-string{color:#a6e3a1}
+.code-full .c-func{color:#89b4fa}
+.code-full .c-dec{color:#f38ba8}
+.code-full .c-var{color:#fab387}
+.code-full .c-op{color:#89dceb}
+.code-full .c-num{color:#f9e2af}
+.code-tag{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;background:var(--purple-bg);color:var(--purple-tx);border:1px solid rgba(74,64,176,.2);font-size:11px;font-weight:600;font-family:var(--mono);margin-bottom:16px;}
+
+/* ─── UTILS ───────────────────────────── */
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+.tag-bronze{background:var(--amber-bg);color:var(--amber-tx);}
+.tag-silver{background:var(--blue-bg);color:var(--blue-tx);}
+.tag-gold{background:#fff8e0;color:#7a5800;border:1px solid #d4a820;}
+</style>
+</head>
+<body>
+
+<!-- ─── NAV ─────────────────────────────── -->
+<nav id="nav">
+  <div id="nav-logo">
+    ◈ Fabric Managed Airflow
+    <span>Orchestration Architecture</span>
+  </div>
+  <div id="nav-links">
+    <a class="nl" href="#s1">Overview</a>
+    <a class="nl" href="#s2">Live DAG</a>
+    <a class="nl" href="#s3">Dependencies</a>
+    <a class="nl" href="#s4">Error &amp; Rerun</a>
+    <a class="nl" href="#s5">DAG Code</a>
+  </div>
+  <div id="nav-badge">Medallion Pipeline</div>
+</nav>
+
+<!-- ─── DOTS ────────────────────────────── -->
+<div id="dots">
+  <button class="dot active" onclick="scrollTo(0)" title="Overview"></button>
+  <button class="dot" onclick="scrollTo(1)" title="Live DAG"></button>
+  <button class="dot" onclick="scrollTo(2)" title="Dependencies"></button>
+  <button class="dot" onclick="scrollTo(3)" title="Error &amp; Rerun"></button>
+  <button class="dot" onclick="scrollTo(4)" title="DAG Code"></button>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- S1: COVER                               -->
+<!-- ═══════════════════════════════════════ -->
+<section id="s1">
+  <div class="s-eyebrow">Medallion · Bronze → Silver → Gold</div>
+  <h1 class="s-title">Fabric Managed <em>Airflow</em><br>Orchestration</h1>
+  <p class="s-sub">
+    A metadata-driven DAG where each task knows its upstream dependencies.
+    Task C only runs when Task A <em>and</em> Task B are both green.
+    Failures are isolated — fix one task and rerun from exactly that point.
+  </p>
+  <div class="cover-stats">
+    <div class="stat-card">
+      <div class="stat-num purple">1</div>
+      <div class="stat-label">DAG file</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num teal">108</div>
+      <div class="stat-label">Sources</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num amber">4</div>
+      <div class="stat-label">Layers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num blue">∞</div>
+      <div class="stat-label">Reruns</div>
+    </div>
+  </div>
+  <div class="cover-badge">
+    ◈ Python DAG · Fabric Managed Airflow · Medallion Architecture
+  </div>
+  <div class="s-num">01</div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- S2: LIVE DAG                            -->
+<!-- ═══════════════════════════════════════ -->
+<section id="s2">
+  <div class="s-eyebrow">Interactive Visualization</div>
+  <h2 class="s-title">The <em>DAG</em> in Action</h2>
+  <p class="s-sub"><strong>medallion_morning_batch</strong> is one DAG. Inside it, each source (FedEx, DHL, UPS) is a pair of tasks running in parallel. Silver 2 unifies all three only when every Silver 1 succeeds. <strong>▶ Happy Path</strong> — all tasks green in dependency order. <strong>💥 Inject Failure</strong> — one Bronze fails, the entire downstream chain stops. <strong>↺ Rerun</strong> — same <code style="font-family:var(--mono);background:var(--bg3);padding:1px 5px;border-radius:3px;">run_id</code>, new <code style="font-family:var(--mono);background:var(--bg3);padding:1px 5px;border-radius:3px;">try_number</code>, only the affected branch replays.</p>
+
+  <div class="dag-wrapper">
+    <!-- Toolbar -->
+    <div class="dag-toolbar">
+      <span class="dag-toolbar-title">DAG: medallion_morning_batch</span>
+      <span style="font-size:10px;color:var(--tx3);font-weight:600;letter-spacing:.04em;">· 3 sources · 1 cron · tasks inside</span>
+      <button class="btn btn-run" id="btn-run" onclick="runScenario('happy')">▶ Happy Path</button>
+      <button class="btn btn-fail" id="btn-fail" onclick="runScenario('failure')">💥 Inject Failure</button>
+      <button class="btn btn-rerun" id="btn-rerun" onclick="runRerun()">↺ Rerun (same run_id)</button>
+      <button class="btn btn-reset" id="btn-reset" onclick="resetDAG()">↺ Reset</button>
+      <span class="dag-status-msg" id="status-msg">Ready — choose a scenario</span>
+    </div>
+
+    <!-- DAG Canvas -->
+    <div class="dag-canvas" id="dag-canvas">
+      <!-- SVG Arrows -->
+      <svg id="dag-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+
+      <!-- DAG label pill -->
+      <div class="dag-dag-label">medallion_morning_batch · schedule: 0 6 * * *</div>
+
+      <!-- START node -->
+      <div class="t-node state-pending" id="node-start"
+           style="left:18px;top:184px;width:70px;height:60px;border-radius:50%;font-size:11px;">
+        <div class="t-label">START</div>
+        <div class="t-state" id="state-start">pending</div>
+      </div>
+
+      <!-- BRONZE layer — 3 parallel sources -->
+      <div class="t-node layer-bronze state-pending" id="node-ingest_fedex"
+           style="left:122px;top:38px;width:148px;height:62px;">
+        <div class="t-label">bronze_fedex</div>
+        <div class="t-layer">Bronze · FedEx</div>
+        <div class="t-state" id="state-ingest_fedex">pending</div>
+      </div>
+      <div class="t-node layer-bronze state-pending" id="node-ingest_dhl"
+           style="left:122px;top:183px;width:148px;height:62px;">
+        <div class="t-label">bronze_dhl</div>
+        <div class="t-layer">Bronze · DHL</div>
+        <div class="t-state" id="state-ingest_dhl">pending</div>
+      </div>
+      <div class="t-node layer-bronze state-pending" id="node-ingest_ups"
+           style="left:122px;top:328px;width:148px;height:62px;">
+        <div class="t-label">bronze_ups</div>
+        <div class="t-layer">Bronze · UPS</div>
+        <div class="t-state" id="state-ingest_ups">pending</div>
+      </div>
+
+      <!-- SILVER 1 layer -->
+      <div class="t-node layer-silver1 state-pending" id="node-silver1_fedex"
+           style="left:308px;top:38px;width:155px;height:62px;">
+        <div class="t-label">silver1_fedex</div>
+        <div class="t-layer">Silver 1 · Staging</div>
+        <div class="t-state" id="state-silver1_fedex">pending</div>
+      </div>
+      <div class="t-node layer-silver1 state-pending" id="node-silver1_dhl"
+           style="left:308px;top:183px;width:155px;height:62px;">
+        <div class="t-label">silver1_dhl</div>
+        <div class="t-layer">Silver 1 · Staging</div>
+        <div class="t-state" id="state-silver1_dhl">pending</div>
+      </div>
+      <div class="t-node layer-silver1 state-pending" id="node-silver1_ups"
+           style="left:308px;top:328px;width:155px;height:62px;">
+        <div class="t-label">silver1_ups</div>
+        <div class="t-layer">Silver 1 · Staging</div>
+        <div class="t-state" id="state-silver1_ups">pending</div>
+      </div>
+
+      <!-- SILVER 2 layer — all 3 must succeed (all_success) -->
+      <div class="t-node layer-silver2 state-pending" id="node-silver2_invoice"
+           style="left:506px;top:183px;width:168px;height:62px;">
+        <div class="t-label">silver2_carrier_invoice</div>
+        <div class="t-layer">Silver 2 · Curated · UNION</div>
+        <div class="t-state" id="state-silver2_invoice">pending</div>
+      </div>
+
+      <!-- GOLD layer -->
+      <div class="t-node layer-gold state-pending" id="node-gold_fact"
+           style="left:722px;top:183px;width:152px;height:62px;">
+        <div class="t-label">gold_fact_invoice</div>
+        <div class="t-layer">Gold · Star Schema</div>
+        <div class="t-state" id="state-gold_fact">pending</div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="dag-legend">
+      <div class="leg-item"><div class="leg-dot leg-pending"></div>pending</div>
+      <div class="leg-item"><div class="leg-dot leg-running"></div>running</div>
+      <div class="leg-item"><div class="leg-dot leg-success"></div>success</div>
+      <div class="leg-item"><div class="leg-dot leg-failed"></div>failed</div>
+      <div class="leg-item"><div class="leg-dot leg-retrying"></div>retrying</div>
+      <div class="leg-item"><div class="leg-dot leg-upfail"></div>upstream_failed</div>
+      <div style="margin-left:auto;font-size:11px;color:var(--tx3);">
+        <span class="tag tag-bronze">bronze</span>&nbsp;
+        <span class="tag tag-silver">silver</span>&nbsp;
+        <span class="tag tag-gold">gold</span>
+      </div>
+    </div>
+  </div>
+  <div class="s-num">02</div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- S3: DEPENDENCY RESOLUTION              -->
+<!-- ═══════════════════════════════════════ -->
+<section id="s3">
+  <div class="s-eyebrow">How Airflow Handles This</div>
+  <h2 class="s-title">Dependency <em>Resolution</em></h2>
+  <p class="s-sub">Airflow uses the <code style="font-family:var(--mono);background:var(--bg3);padding:2px 6px;border-radius:4px;">&gt;&gt;</code> operator to wire dependencies. Every task uses <code style="font-family:var(--mono);background:var(--bg3);padding:2px 6px;border-radius:4px;">trigger_rule='all_success'</code> — the default. Whether Silver 2 is a UNION or a JOIN, it only runs when <strong>every upstream Silver 1 has succeeded</strong>. One failed source stops the chain; fix it and rerun from that point.</p>
+
+  <div class="dep-grid">
+    <div class="dep-card">
+      <div class="dep-card-title">
+        <span style="font-size:18px;">🔗</span> The Dependency Syntax
+      </div>
+      <div class="dep-card-sub">Three tasks, where <code style="font-family:var(--mono);font-size:11px;">silver2</code> waits for <em>both</em> upstream branches to finish before it can run.</div>
+      <div class="code-block">
+<span class="c-comment"># Define tasks</span>
+<span class="c-var">t_bronze_fedex</span> <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(...)
+<span class="c-var">t_bronze_dhl</span>   <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(...)
+<span class="c-var">t_silver1_fedex</span> <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(...)
+<span class="c-var">t_silver1_dhl</span>   <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(...)
+<span class="c-var">t_silver2</span>       <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(...)
+
+<span class="c-comment"># Wire dependencies</span>
+<span class="c-var">t_bronze_fedex</span> <span class="c-op">&gt;&gt;</span> <span class="c-var">t_silver1_fedex</span>
+<span class="c-var">t_bronze_dhl</span>   <span class="c-op">&gt;&gt;</span> <span class="c-var">t_silver1_dhl</span>
+
+<span class="c-comment"># silver2 waits for BOTH silver1 tasks</span>
+[<span class="c-var">t_silver1_fedex</span>, <span class="c-var">t_silver1_dhl</span>] <span class="c-op">&gt;&gt;</span> <span class="c-var">t_silver2</span>
+      </div>
+    </div>
+
+    <div class="dep-card">
+      <div class="dep-card-title">
+        <span style="font-size:18px;">📋</span> Scheduling Rules
+      </div>
+      <div class="dep-card-sub">Airflow's scheduler evaluates these rules on every tick.</div>
+      <div class="dep-rule">
+        <div class="dep-rule-icon" style="background:var(--green-bg);color:var(--green-str);">✓</div>
+        <div><strong>Task queued</strong> only when all direct upstreams are <code style="font-family:var(--mono);font-size:10px;">success</code></div>
+      </div>
+      <div class="dep-rule">
+        <div class="dep-rule-icon" style="background:var(--blue-bg);color:var(--blue);">∥</div>
+        <div><strong>Independent tasks</strong> (fedex + dhl) run in parallel automatically — no extra config</div>
+      </div>
+      <div class="dep-rule">
+        <div class="dep-rule-icon" style="background:var(--red-bg);color:var(--red-str);">✕</div>
+        <div><strong>Any upstream failure</strong> cascades <code style="font-family:var(--mono);font-size:10px;">upstream_failed</code> to all downstream tasks — Union or Join, the rule is the same: every input must be clean</div>
+      </div>
+      <div class="dep-rule">
+        <div class="dep-rule-icon" style="background:var(--amber-bg);color:var(--amber-str);">↺</div>
+        <div><strong>Partial rerun</strong>: clear one failed task's state → Airflow re-evaluates downstream automatically</div>
+      </div>
+      <div class="dep-rule">
+        <div class="dep-rule-icon" style="background:var(--purple-bg);color:var(--purple-str);">⊕</div>
+        <div><strong>Dynamic tasks</strong>: generate 108 task groups from config table at DAG parse time</div>
+      </div>
+    </div>
+
+    <div class="dep-card" style="grid-column:1/-1">
+      <div class="dep-card-title">
+        <span style="font-size:18px;">🔄</span> Scoped Dependencies — Silver 2 wires only its own sources, all must succeed
+      </div>
+      <div class="dep-card-sub">Each Silver 2 entity declares only the Silver 1 tasks it feeds from (via <code style="font-family:var(--mono);font-size:11px;">silver2_entity</code> in config). All of them must be green. <code style="font-family:var(--mono);font-size:11px;">all_success</code> is the rule — union or join, no partial data enters Silver 2.</div>
+      <div class="code-block" style="font-size:11px;">
+<span class="c-comment"># Build per-source task groups — collect silver1 tasks by entity</span>
+<span class="c-var">silver1_by_entity</span> <span class="c-op">=</span> {}  <span class="c-comment"># { 'carrier_invoice': [task_fedex, task_dhl, ...] }</span>
+
+<span class="c-keyword">for</span> src <span class="c-keyword">in</span> SOURCES:
+    <span class="c-keyword">with</span> <span class="c-func">TaskGroup</span>(<span class="c-string">f"group_{src['source_name']}"</span>) <span class="c-keyword">as</span> grp:
+        bronze  <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(task_id<span class="c-op">=</span><span class="c-string">f"bronze_{src['source_name']}"</span>, ...)
+        silver1 <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(task_id<span class="c-op">=</span><span class="c-string">f"silver1_{src['source_name']}"</span>, ...)
+        bronze <span class="c-op">&gt;&gt;</span> silver1
+
+    entity <span class="c-op">=</span> src[<span class="c-string">'silver2_entity'</span>]
+    <span class="c-var">silver1_by_entity</span>.setdefault(entity, []).append(silver1)
+
+<span class="c-comment"># Silver 2 — all_success (default): every source must be clean before union/join</span>
+<span class="c-keyword">for</span> entity, upstreams <span class="c-keyword">in</span> <span class="c-var">silver1_by_entity</span>.items():
+    s2 <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(task_id<span class="c-op">=</span><span class="c-string">f"silver2_{entity}"</span>, ...)
+    upstreams <span class="c-op">&gt;&gt;</span> s2 <span class="c-op">&gt;&gt;</span> <span class="c-var">t_gold_fact_invoice</span>  <span class="c-comment"># no trigger_rule needed — all_success is default</span>
+      </div>
+    </div>
+  </div>
+  <div class="s-num">03</div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- S4: ERROR HANDLING & RERUN             -->
+<!-- ═══════════════════════════════════════ -->
+<section id="s4">
+  <div class="s-eyebrow">Resilience Patterns</div>
+  <h2 class="s-title">Error Handling <em>&amp; Rerun</em></h2>
+  <p class="s-sub">Four patterns work together so a single source failure never takes down the whole pipeline — and recovery is surgical, not a full restart.</p>
+
+  <div class="err-grid">
+    <!-- Card 1: Auto Retry -->
+    <div class="err-card">
+      <div class="err-icon" style="background:var(--amber-bg);">🔁</div>
+      <div class="err-title">1 · Auto Retry with Backoff</div>
+      <div class="err-body">Transient failures (network blip, API timeout) retry automatically. <code style="font-family:var(--mono);font-size:11px;">retries=3</code> with exponential backoff before marking the task truly failed.</div>
+      <div class="err-code">
+<span class="c-func">FabricNotebookOperator</span>(
+  task_id<span class="c-op">=</span><span class="c-string">"ingest_fedex"</span>,
+  <span class="c-var">retries</span><span class="c-op">=</span><span class="c-num">3</span>,
+  <span class="c-var">retry_delay</span><span class="c-op">=</span><span class="c-func">timedelta</span>(minutes<span class="c-op">=</span><span class="c-num">5</span>),
+  <span class="c-var">retry_exponential_backoff</span><span class="c-op">=</span><span class="c-keyword">True</span>,
+)
+<span class="c-comment"># attempt 1 → fail → wait 5m
+# attempt 2 → fail → wait 10m
+# attempt 3 → fail → wait 20m → FAILED</span>
+      </div>
+    </div>
+
+    <!-- Card 2: Partial Rerun + run_id -->
+    <div class="err-card">
+      <div class="err-icon" style="background:var(--blue-bg);">🎯</div>
+      <div class="err-title">2 · Partial Rerun — Same <code style="font-size:12px;font-family:var(--mono);">run_id</code></div>
+      <div class="err-body">Clearing a task reruns it <strong>inside the same DAG run</strong>. The <code style="font-family:var(--mono);font-size:11px;">run_id</code> never changes — only <code style="font-family:var(--mono);font-size:11px;">try_number</code> increments. Already-successful tasks keep their state untouched.</div>
+      <div class="err-code">
+<span class="c-comment"># Same run_id, new try_number</span>
+<span class="c-comment"># run_id: scheduled__2026-03-23T06:00:00+00:00  ← unchanged</span>
+<span class="c-comment"># ingest_dhl  try=1 → failed</span>
+<span class="c-comment"># ingest_dhl  try=2 → success  (after clear)</span>
+
+airflow tasks clear medallion_morning_batch <span class="c-op">\</span>
+  <span class="c-op">-t</span> <span class="c-string">"group_dhl_direct_invoice.bronze_dhl_direct_invoice"</span> <span class="c-op">\</span>
+  <span class="c-op">-d</span> <span class="c-string">"2026-03-23"</span>
+
+<span class="c-comment"># ✓ bronze_fedex + silver1_fedex stay success
+# ✓ bronze_ups   + silver1_ups   stay success
+# ✓ only dhl branch + downstream re-queue</span>
+      </div>
+    </div>
+
+    <!-- Card 3: ExternalTaskSensor -->
+    <div class="err-card">
+      <div class="err-icon" style="background:var(--teal-bg);">👁️</div>
+      <div class="err-title">3 · Cross-DAG Sensors</div>
+      <div class="err-body">If Silver 2 is a <em>separate</em> DAG (e.g., runs daily vs. hourly ingest), use <code style="font-family:var(--mono);font-size:11px;">ExternalTaskSensor</code> to block Gold until Silver is confirmed complete.</div>
+      <div class="err-code">
+<span class="c-comment"># gold_dag.py — waits for silver DAG success</span>
+<span class="c-var">wait_for_silver</span> <span class="c-op">=</span> <span class="c-func">ExternalTaskSensor</span>(
+  task_id<span class="c-op">=</span><span class="c-string">"wait_silver2_done"</span>,
+  <span class="c-var">external_dag_id</span><span class="c-op">=</span><span class="c-string">"silver_pipeline"</span>,
+  <span class="c-var">external_task_id</span><span class="c-op">=</span><span class="c-string">"silver2_carrier_invoice"</span>,
+  <span class="c-var">timeout</span><span class="c-op">=</span><span class="c-num">3600</span>,
+  <span class="c-var">mode</span><span class="c-op">=</span><span class="c-string">"reschedule"</span>,  <span class="c-comment"># don't block a worker</span>
+)
+      </div>
+    </div>
+
+    <!-- Card 4: Alerts -->
+    <div class="err-card">
+      <div class="err-icon" style="background:var(--red-bg);">🔔</div>
+      <div class="err-title">4 · Failure Alerts &amp; SLA Miss</div>
+      <div class="err-body">Task-level callbacks fire on failure, retry, or SLA miss. Sends a Teams message via webhook so the on-call person knows exactly <em>which source</em> and <em>which layer</em> failed.</div>
+      <div class="err-code">
+<span class="c-keyword">def</span> <span class="c-func">on_failure</span>(context):
+  source <span class="c-op">=</span> context[<span class="c-string">"task_instance"</span>].task_id
+  <span class="c-func">send_teams_alert</span>(
+    title<span class="c-op">=</span><span class="c-string">f"❌ Failed: {source}"</span>,
+    dag<span class="c-op">=</span>context[<span class="c-string">"dag"</span>].dag_id,
+    run_id<span class="c-op">=</span>context[<span class="c-string">"run_id"</span>],
+  )
+
+<span class="c-var">default_args</span> <span class="c-op">=</span> {
+  <span class="c-string">"on_failure_callback"</span>: <span class="c-var">on_failure</span>,
+  <span class="c-string">"sla"</span>: <span class="c-func">timedelta</span>(hours<span class="c-op">=</span><span class="c-num">2</span>),
+}
+      </div>
+    </div>
+  </div>
+  <div class="s-num">04</div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- S5: PYTHON DAG CODE                    -->
+<!-- ═══════════════════════════════════════ -->
+<section id="s5">
+  <div class="s-eyebrow">The DAG Definition</div>
+  <h2 class="s-title">One <em>Python File</em>, 108 Sources</h2>
+  <p class="s-sub">The entire orchestration is defined in a single <code style="font-family:var(--mono);background:var(--bg3);padding:2px 6px;border-radius:4px;">medallion_pipeline.py</code> file. At parse time, Airflow reads <code style="font-family:var(--mono);background:var(--bg3);padding:2px 6px;border-radius:4px;">sources.json</code> and generates all 108 task groups dynamically — no copy-paste, no per-source files.</p>
+
+  <div class="code-tag">fabric/dags/medallion_pipeline.py</div>
+
+  <div class="code-full">
+<span class="c-comment">"""
+Fabric Managed Airflow — Medallion Pipeline DAG
+Metadata-driven: reads sources.json at parse time to generate task groups.
+"""</span>
+<span class="c-keyword">import</span> json
+<span class="c-keyword">from</span> datetime <span class="c-keyword">import</span> datetime, timedelta
+<span class="c-keyword">from</span> pathlib <span class="c-keyword">import</span> Path
+
+<span class="c-keyword">from</span> airflow.decorators <span class="c-keyword">import</span> dag
+<span class="c-keyword">from</span> airflow.utils.task_group <span class="c-keyword">import</span> TaskGroup
+<span class="c-keyword">from</span> airflow.sensors.external_task <span class="c-keyword">import</span> ExternalTaskSensor
+<span class="c-keyword">from</span> airflow_fabric.operators <span class="c-keyword">import</span> FabricNotebookOperator  <span class="c-comment"># Fabric custom operator</span>
+<span class="c-keyword">from</span> airflow_fabric.operators <span class="c-keyword">import</span> FabricSQLOperator
+<span class="c-keyword">from</span> callbacks <span class="c-keyword">import</span> on_failure_teams_alert
+
+<span class="c-comment"># ── Config ──────────────────────────────────────────────────────────</span>
+<span class="c-var">ENV</span>     <span class="c-op">=</span> Variable.<span class="c-func">get</span>(<span class="c-string">"environment"</span>, default_var<span class="c-op">=</span><span class="c-string">"dev"</span>)
+<span class="c-var">SOURCES</span> <span class="c-op">=</span> json.<span class="c-func">loads</span>(Path(<span class="c-string">"config/sources.json"</span>).<span class="c-func">read_text</span>())
+<span class="c-var">SOURCES</span> <span class="c-op">=</span> [s <span class="c-keyword">for</span> s <span class="c-keyword">in</span> SOURCES <span class="c-keyword">if</span> s[<span class="c-string">"is_enabled"</span>] <span class="c-keyword">and</span> s[<span class="c-string">"environment"</span>] <span class="c-op">==</span> ENV]
+
+<span class="c-var">default_args</span> <span class="c-op">=</span> {
+    <span class="c-string">"retries"</span>: <span class="c-num">3</span>,
+    <span class="c-string">"retry_delay"</span>: <span class="c-func">timedelta</span>(minutes<span class="c-op">=</span><span class="c-num">5</span>),
+    <span class="c-string">"retry_exponential_backoff"</span>: <span class="c-keyword">True</span>,
+    <span class="c-string">"on_failure_callback"</span>: <span class="c-var">on_failure_teams_alert</span>,
+    <span class="c-string">"sla"</span>: <span class="c-func">timedelta</span>(hours<span class="c-op">=</span><span class="c-num">4</span>),
+}
+
+<span class="c-comment"># ── DAG ─────────────────────────────────────────────────────────────</span>
+<span class="c-op">@</span><span class="c-dec">dag</span>(
+    dag_id<span class="c-op">=</span><span class="c-string">"medallion_pipeline"</span>,
+    schedule_interval<span class="c-op">=</span><span class="c-string">"0 6 * * *"</span>,
+    start_date<span class="c-op">=</span><span class="c-func">datetime</span>(<span class="c-num">2026</span>, <span class="c-num">1</span>, <span class="c-num">1</span>),
+    default_args<span class="c-op">=</span><span class="c-var">default_args</span>,
+    catchup<span class="c-op">=</span><span class="c-keyword">False</span>,
+    tags<span class="c-op">=</span>[<span class="c-string">"medallion"</span>, <span class="c-string">"fabric"</span>, ENV],
+)
+<span class="c-keyword">def</span> <span class="c-func">medallion_pipeline</span>():
+
+    <span class="c-comment"># ── Phase 1 + 2: Bronze + Silver 1, per source ──────────────────</span>
+    <span class="c-var">all_silver1_tasks</span> <span class="c-op">=</span> []
+
+    <span class="c-keyword">for</span> src <span class="c-keyword">in</span> SOURCES:
+        <span class="c-keyword">with</span> <span class="c-func">TaskGroup</span>(<span class="c-string">f"group_{src['source_name']}"</span>) <span class="c-keyword">as</span> grp:
+
+            <span class="c-comment"># Bronze: land raw file in OneLake</span>
+            bronze <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(
+                task_id<span class="c-op">=</span><span class="c-string">f"bronze_{src['source_name']}"</span>,
+                notebook_name<span class="c-op">=</span><span class="c-string">"bronze/ingest_file"</span>,
+                parameters<span class="c-op">=</span>{**src, <span class="c-string">"layer"</span>: <span class="c-string">"bronze"</span>},
+            )
+
+            <span class="c-comment"># Silver 1: clean + MERGE into staging_{source_name}</span>
+            silver1 <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(
+                task_id<span class="c-op">=</span><span class="c-string">f"silver1_{src['source_name']}"</span>,
+                notebook_name<span class="c-op">=</span><span class="c-string">f"silver1/{src['silver1_notebook']}"</span>,
+                parameters<span class="c-op">=</span>{**src, <span class="c-string">"layer"</span>: <span class="c-string">"silver1"</span>},
+            )
+
+            bronze <span class="c-op">&gt;&gt;</span> silver1  <span class="c-comment"># silver1 waits for bronze</span>
+
+        <span class="c-var">all_silver1_tasks</span>.<span class="c-func">append</span>(silver1)
+
+    <span class="c-comment"># ── Phase 3: Silver 2 — scoped per entity, all_success (default) ──</span>
+    <span class="c-var">silver1_by_entity</span> <span class="c-op">=</span> {}
+    <span class="c-keyword">for</span> src, task <span class="c-keyword">in</span> <span class="c-func">zip</span>(SOURCES, <span class="c-var">all_silver1_tasks</span>):
+        <span class="c-var">silver1_by_entity</span>.<span class="c-func">setdefault</span>(src[<span class="c-string">'silver2_entity'</span>], []).<span class="c-func">append</span>(task)
+
+    <span class="c-var">silver2_tasks</span> <span class="c-op">=</span> []
+    <span class="c-keyword">for</span> entity, upstreams <span class="c-keyword">in</span> <span class="c-var">silver1_by_entity</span>.items():
+        silver2 <span class="c-op">=</span> <span class="c-func">FabricNotebookOperator</span>(
+            task_id<span class="c-op">=</span><span class="c-string">f"silver2_{entity}"</span>,
+            notebook_name<span class="c-op">=</span><span class="c-string">f"silver2/build_{entity}"</span>,
+            <span class="c-comment"># all_success is default — every upstream must be green (union or join)</span>
+        )
+        upstreams <span class="c-op">&gt;&gt;</span> silver2
+        <span class="c-var">silver2_tasks</span>.<span class="c-func">append</span>(silver2)
+
+    <span class="c-comment"># ── Phase 4: Gold — stored proc in Fabric Data Warehouse ────────</span>
+    gold <span class="c-op">=</span> <span class="c-func">FabricSQLOperator</span>(
+        task_id<span class="c-op">=</span><span class="c-string">"gold_fact_invoice"</span>,
+        sql<span class="c-op">=</span><span class="c-string">"EXEC gold.load_fact_invoice"</span>,
+        warehouse<span class="c-op">=</span><span class="c-string">"fabric_data_warehouse"</span>,
+    )
+    <span class="c-var">silver2_tasks</span> <span class="c-op">&gt;&gt;</span> gold
+
+<span class="c-func">medallion_pipeline</span>()
+  </div>
+  <div class="s-num">05</div>
+</section>
+
+<!-- ─────────────────────────────────────── -->
+<!-- SCRIPTS                                 -->
+<!-- ─────────────────────────────────────── -->
+<script>
+/* ── Dot / section navigation ─────────────────────────── */
+const sections = document.querySelectorAll('section');
+const dots = document.querySelectorAll('.dot');
+const navLinks = document.querySelectorAll('.nl');
+
+function scrollTo(idx){sections[idx].scrollIntoView({behavior:'smooth'})}
+
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      const i = [...sections].indexOf(e.target);
+      dots.forEach((d,j) => d.classList.toggle('active', j===i));
+      navLinks.forEach((a,j) => a.classList.toggle('active', j===i));
+    }
+  });
+},{threshold:0.5});
+sections.forEach(s => obs.observe(s));
+
+/* ── DAG Animation Engine ──────────────────────────────── */
+const NODES = ['start','ingest_fedex','ingest_dhl','ingest_ups','silver1_fedex','silver1_dhl','silver1_ups','silver2_invoice','gold_fact'];
+const LAYER_CLASSES = {
+  'start':           '',
+  'ingest_fedex':    'layer-bronze',
+  'ingest_dhl':      'layer-bronze',
+  'ingest_ups':      'layer-bronze',
+  'silver1_fedex':   'layer-silver1',
+  'silver1_dhl':     'layer-silver1',
+  'silver1_ups':     'layer-silver1',
+  'silver2_invoice': 'layer-silver2',
+  'gold_fact':       'layer-gold',
+};
+
+let animTimer = null;
+let currentScenario = null;
+
+function setNodeState(id, state){
+  const el = document.getElementById('node-' + id);
+  const lbl = document.getElementById('state-' + id);
+  if(!el) return;
+  // Remove all state classes
+  el.className = el.className.replace(/state-\S+/g,'').trim();
+  el.classList.add('state-' + state);
+  if(LAYER_CLASSES[id]) el.classList.add(LAYER_CLASSES[id]);
+  if(lbl) lbl.textContent = state;
+  // Update arrow colors
+  drawArrows();
+}
+
+function getState(id){
+  const el = document.getElementById('node-' + id);
+  if(!el) return 'pending';
+  const m = el.className.match(/state-(\S+)/);
+  return m ? m[1] : 'pending';
+}
+
+/* ── SVG Arrow drawing ─────────────────────────────────── */
+// Arrows: [fromId, toId, label?]
+const ARROWS = [
+  ['start',        'ingest_fedex'],
+  ['start',        'ingest_dhl'],
+  ['start',        'ingest_ups'],
+  ['ingest_fedex', 'silver1_fedex'],
+  ['ingest_dhl',   'silver1_dhl'],
+  ['ingest_ups',   'silver1_ups'],
+  ['silver1_fedex','silver2_invoice'],
+  ['silver1_dhl',  'silver2_invoice'],
+  ['silver1_ups',  'silver2_invoice'],
+  ['silver2_invoice','gold_fact'],
+];
+
+function nodeCenter(id){
+  const el = document.getElementById('node-' + id);
+  if(!el) return {x:0,y:0,w:0,h:0};
+  return {
+    x: el.offsetLeft,
+    y: el.offsetTop,
+    w: el.offsetWidth,
+    h: el.offsetHeight,
+  };
+}
+
+function arrowColor(fromId, toId){
+  const fs = getState(fromId);
+  const ts = getState(toId);
+  if(fs === 'success' && (ts === 'running' || ts === 'success')) return '#5c8f1e';
+  if(fs === 'failed' || ts === 'failed') return '#c0392b';
+  if(fs === 'upstream_failed' || ts === 'upstream_failed') return '#c0bdb6';
+  if(fs === 'running') return '#1565a8';
+  return '#c8c4bc';
+}
+
+function drawArrows(){
+  const svg = document.getElementById('dag-svg');
+  svg.innerHTML = '';
+
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  // Arrow markers per color
+  const colors = {
+    'green': '#5c8f1e',
+    'blue': '#1565a8',
+    'red': '#c0392b',
+    'gray': '#c8c4bc',
+    'dimgray': '#c0bdb6',
+  };
+  for(const [name, col] of Object.entries(colors)){
+    const marker = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    marker.setAttribute('id','arr-'+name);
+    marker.setAttribute('markerWidth','8');
+    marker.setAttribute('markerHeight','6');
+    marker.setAttribute('refX','7');
+    marker.setAttribute('refY','3');
+    marker.setAttribute('orient','auto');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    poly.setAttribute('points','0 0, 8 3, 0 6');
+    poly.setAttribute('fill', col);
+    marker.appendChild(poly);
+    defs.appendChild(marker);
+  }
+  svg.appendChild(defs);
+
+  function colorToName(c){
+    if(c==='#5c8f1e') return 'green';
+    if(c==='#1565a8') return 'blue';
+    if(c==='#c0392b') return 'red';
+    if(c==='#c0bdb6') return 'dimgray';
+    return 'gray';
+  }
+
+  ARROWS.forEach(([fromId, toId]) => {
+    const f = nodeCenter(fromId);
+    const t = nodeCenter(toId);
+
+    // Source: right-middle of from node, Target: left-middle of to node
+    const x1 = f.x + f.w;
+    const y1 = f.y + f.h / 2;
+    const x2 = t.x;
+    const y2 = t.y + t.h / 2;
+
+    const dx = (x2 - x1) * 0.45;
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    const d = `M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`;
+    const col = arrowColor(fromId, toId);
+    const cname = colorToName(col);
+
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', col);
+    path.setAttribute('stroke-width', getState(fromId)==='running' ? '2.5' : '2');
+    path.setAttribute('stroke-dasharray', (getState(fromId)==='upstream_failed'||getState(toId)==='upstream_failed') ? '6,4' : 'none');
+    path.setAttribute('marker-end', `url(#arr-${cname})`);
+    path.setAttribute('opacity', '0.85');
+    svg.appendChild(path);
+  });
+}
+
+/* ── Scenarios ─────────────────────────────────────────── */
+const HAPPY = [
+  {t:'start',          s:'success', ms:0},
+  // All 3 bronze start in parallel
+  {t:'ingest_fedex',   s:'running', ms:300},
+  {t:'ingest_dhl',     s:'running', ms:300},
+  {t:'ingest_ups',     s:'running', ms:300},
+  // FedEx finishes first, DHL and UPS staggered
+  {t:'ingest_fedex',   s:'success', ms:1200},
+  {t:'silver1_fedex',  s:'running', ms:1400},
+  {t:'ingest_ups',     s:'success', ms:1600},
+  {t:'silver1_ups',    s:'running', ms:1800},
+  {t:'ingest_dhl',     s:'success', ms:1900},
+  {t:'silver1_dhl',    s:'running', ms:2100},
+  // Silver 1 tasks finish
+  {t:'silver1_fedex',  s:'success', ms:2800},
+  {t:'silver1_ups',    s:'success', ms:3100},
+  {t:'silver1_dhl',    s:'success', ms:3300},
+  // All 3 silver1 done → silver2 can now run
+  {t:'silver2_invoice',s:'running', ms:3500},
+  {t:'silver2_invoice',s:'success', ms:4800},
+  {t:'gold_fact',      s:'running', ms:5000},
+  {t:'gold_fact',      s:'success', ms:6200},
+];
+
+const FAILURE = [
+  {t:'start',          s:'success',        ms:0},
+  // All 3 start in parallel
+  {t:'ingest_fedex',   s:'running',        ms:300},
+  {t:'ingest_dhl',     s:'running',        ms:300},
+  {t:'ingest_ups',     s:'running',        ms:300},
+  // FedEx and UPS succeed
+  {t:'ingest_fedex',   s:'success',        ms:1200},
+  {t:'silver1_fedex',  s:'running',        ms:1400},
+  {t:'ingest_ups',     s:'success',        ms:1500},
+  {t:'silver1_ups',    s:'running',        ms:1700},
+  // DHL retries then fails
+  {t:'ingest_dhl',     s:'retrying',       ms:1600},
+  {t:'silver1_fedex',  s:'success',        ms:2600},
+  {t:'silver1_ups',    s:'success',        ms:2900},
+  {t:'ingest_dhl',     s:'failed',         ms:3100},
+  // silver1_dhl blocked, silver2 and gold also blocked (all_success)
+  {t:'silver1_dhl',    s:'upstream_failed',ms:3300},
+  {t:'silver2_invoice',s:'upstream_failed',ms:3500},
+  {t:'gold_fact',      s:'upstream_failed',ms:3500},
+];
+
+const RERUN = [
+  // Only the failed DHL branch reruns — fedex + ups stay success, untouched
+  {t:'ingest_dhl',     s:'running', ms:400},
+  {t:'ingest_dhl',     s:'success', ms:1600},
+  {t:'silver1_dhl',    s:'running', ms:1800},
+  {t:'silver1_dhl',    s:'success', ms:3000},
+  // Now all 3 silver1 are green → silver2 unblocks
+  {t:'silver2_invoice',s:'running', ms:3200},
+  {t:'silver2_invoice',s:'success', ms:4600},
+  {t:'gold_fact',      s:'running', ms:4800},
+  {t:'gold_fact',      s:'success', ms:6000},
+];
+
+function disableButtons(){
+  ['btn-run','btn-fail','btn-reset','btn-rerun'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.disabled = true;
+  });
+}
+function enableButtons(){
+  ['btn-run','btn-fail','btn-reset'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.disabled = false;
+  });
+}
+
+function setStatus(msg){ document.getElementById('status-msg').textContent = msg; }
+
+function runScenario(type){
+  resetDAG(false);
+  disableButtons();
+  currentScenario = type;
+
+  const steps = type === 'happy' ? HAPPY : FAILURE;
+  const maxMs = steps[steps.length-1].ms + 600;
+
+  setStatus(type === 'happy'
+    ? '▶ All 3 bronze tasks start in parallel. Silver 2 waits until every Silver 1 is green...'
+    : '💥 bronze_dhl fails — silver2 and gold are blocked (all_success). FedEx + UPS already succeeded. Click ↺ Rerun to recover.');
+
+  steps.forEach(step => {
+    setTimeout(() => {
+      setNodeState(step.t, step.s);
+    }, step.ms);
+  });
+
+  setTimeout(() => {
+    enableButtons();
+    document.getElementById('btn-reset').disabled = false;
+    if(type === 'failure'){
+      setStatus('❌ bronze_dhl failed (try=1). Click ↺ Rerun — same run_id, new try_number. Only the DHL branch reruns.');
+      document.getElementById('btn-rerun').style.display = 'inline-flex';
+      document.getElementById('btn-rerun').disabled = false;
+    } else if(type === 'trigger_rule'){
+      setStatus('✅ silver2 + gold completed — ingest_dhl failure was isolated. silver1_dhl skipped (logged).');
+    } else {
+      setStatus('✅ All tasks completed successfully.');
+    }
+  }, maxMs);
+}
+
+function runRerun(){
+  document.getElementById('btn-rerun').disabled = true;
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-fail').disabled = true;
+  setStatus('↺ Clearing bronze_dhl state — FedEx + UPS stay success. Only DHL branch reruns...');
+
+  const maxMs = RERUN[RERUN.length-1].ms + 600;
+  RERUN.forEach(step => {
+    setTimeout(() => { setNodeState(step.t, step.s); }, step.ms);
+  });
+
+  setTimeout(() => {
+    enableButtons();
+    document.getElementById('btn-rerun').style.display = 'none';
+    setStatus('✅ Recovery complete — same run_id, try=2. Only the DHL branch reran. All 3 Silver 1 now green → Silver 2 + Gold unblocked.');
+  }, maxMs);
+}
+
+function resetDAG(reEnable = true){
+  clearTimeout(animTimer);
+  NODES.forEach(id => setNodeState(id, 'pending'));
+  document.getElementById('btn-rerun').style.display = 'none';
+  setStatus('Ready — choose a scenario');
+  if(reEnable) enableButtons();
+  drawArrows();
+}
+
+/* ── Initial draw & resize ─────────────────────────────── */
+window.addEventListener('load', () => { drawArrows(); });
+window.addEventListener('resize', drawArrows);
+</script>
+</body>
+</html>

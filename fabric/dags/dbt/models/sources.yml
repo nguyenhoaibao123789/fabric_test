@@ -1,0 +1,38 @@
+version: 2
+
+sources:
+  - name: silver
+    # Cross-database query: Fabric Warehouse queries Silver Lakehouse SQL endpoint.
+    # Both items must be in the same Fabric workspace.
+    # The database name must match the Lakehouse display name exactly.
+    database: "{{ env_var('DBT_LAKEHOUSE', 'fabric_lakehouse') }}"
+    schema: silver
+    tables:
+      - name: carrier_invoice
+        description: >
+          Unified carrier invoice table produced by Silver 2
+          (build_carrier_invoice notebook). One row per invoice line.
+        columns:
+          - name: invoice_number
+            description: Carrier-assigned invoice identifier
+          - name: invoice_date
+            description: Invoice issue date
+          - name: shipment_date
+            description: Shipment despatch date
+          - name: carrier
+            description: Carrier code (e.g. FEDEX, DHL)
+          - name: service_type
+            description: Carrier service level code
+          - name: charge_amount
+            description: Billed charge amount
+          - name: charge_currency
+            description: ISO 4217 currency code
+          - name: tracking_number
+          - name: purchase_contract
+          - name: origin_country
+          - name: destination_country
+          - name: weight_kg
+          - name: account_number
+          - name: _source_name
+          - name: _source_file
+          - name: _run_id

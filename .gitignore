@@ -1,0 +1,17 @@
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Fabric config with secrets / IDs — create manually, never commit
+config/resource_ids_*.json
+config/prod.json
+
+# Terraform state
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.backup
+
+#Claude
+.claude/
