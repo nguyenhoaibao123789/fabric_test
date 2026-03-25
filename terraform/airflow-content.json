@@ -1,0 +1,33 @@
+{
+  "properties": {
+    "type": "Airflow",
+    "typeProperties": {
+      "airflowProperties": {
+        "airflowConfigurationOverrides": {},
+        "airflowEnvironment": "FabricAirflowJob-1.0.0",
+        "airflowEnvironmentVariables": {},
+        "airflowRequirements": [],
+        "airflowVersion": "2.10.5",
+        "enableAADIntegration": true,
+        "enableTriggerers": false,
+        "pythonVersion": "3.12"
+      },
+      "computeProperties": {
+        "computePool": "StarterPool",
+        "computeSize": "Small",
+        "enableAutoscale": false,
+        "enableAvailabilityZones": false,
+        "extraNodes": 0,
+        "poolId": "00000000-0000-0000-0000-000000000000",
+        "poolName": "StarterPool"
+      },
+      "gitSyncProperties": {
+        "gitServiceType": "GitHub",
+        "repoUrl": "{{ .git_repo_url }}",
+        "branchName": "{{ .git_branch }}",
+        "rootFolder": "{{ .git_dags_folder }}",
+        "connectionId": "{{ .git_connection_id }}"
+      }
+    }
+  }
+}
