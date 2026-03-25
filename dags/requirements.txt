@@ -1,1 +1,1 @@
-apache-airflow-providers-microsoft-fabric
+apache-airflow-microsoft-fabric-plugin
