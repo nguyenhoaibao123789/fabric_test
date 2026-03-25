@@ -27,18 +27,18 @@ environments:
 # deploy.py reads this to know what to upload.
 
 notebooks:
-  shared_functions:       fabric/notebooks/shared/shared_functions.ipynb
-  ingest_file:            fabric/notebooks/bronze/ingest_file.ipynb
-  process_invoice:        fabric/notebooks/silver1/process_invoice.ipynb
-  build_carrier_invoice:  fabric/notebooks/silver2/build_carrier_invoice.ipynb
+  shared_functions:       notebooks/shared/shared_functions.ipynb
+  ingest_file:            notebooks/bronze/ingest_file.ipynb
+  process_invoice:        notebooks/silver1/process_invoice.ipynb
+  build_carrier_invoice:  notebooks/silver2/build_carrier_invoice.ipynb
 
 # ── dbt Gold layer ────────────────────────────────────────────────────────────
 dbt_project: dbt/
 
 # ── DAG layout ───────────────────────────────────────────────────────────────
 dag_files:
-  - fabric/dags/medallion_pipeline.py
-  - fabric/dags/callbacks.py
+  - dags/medallion_pipeline.py
+  - dags/callbacks.py
 
 # ── SQL layout ───────────────────────────────────────────────────────────────
 sql_files:

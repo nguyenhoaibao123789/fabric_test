@@ -2,16 +2,16 @@ locals {
   # Map notebook display name → source .ipynb path
   notebooks = {
     "shared_functions" = {
-      ipynb_path = "${path.module}/../fabric/notebooks/shared/shared_functions.ipynb"
+      ipynb_path = "${path.module}/../notebooks/shared/shared_functions.ipynb"
     }
     "ingest_file" = {
-      ipynb_path = "${path.module}/../fabric/notebooks/bronze/ingest_file.ipynb"
+      ipynb_path = "${path.module}/../notebooks/bronze/ingest_file.ipynb"
     }
     "process_invoice" = {
-      ipynb_path = "${path.module}/../fabric/notebooks/silver1/process_invoice.ipynb"
+      ipynb_path = "${path.module}/../notebooks/silver1/process_invoice.ipynb"
     }
     "build_carrier_invoice" = {
-      ipynb_path = "${path.module}/../fabric/notebooks/silver2/build_carrier_invoice.ipynb"
+      ipynb_path = "${path.module}/../notebooks/silver2/build_carrier_invoice.ipynb"
     }
   }
 }
