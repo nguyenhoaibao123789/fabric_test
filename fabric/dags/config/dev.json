@@ -1,0 +1,12 @@
+{
+  "environment": "dev",
+  "workspace_name": "dev-fabric-data",
+  "lakehouse": "fabric_lakehouse",
+  "gold_warehouse": "fabric_gold_warehouse",
+  "key_vault_name": "dev-fabric-kv",
+  "key_vault_url": "https://dev-fabric-kv.vault.azure.net/",
+  "gold_warehouse_sql_endpoint": "8dac972c-0ff1-400f-bba3-e1e2302070b5.datawarehouse.fabric.microsoft.com",
+  "teams_webhook_secret": "teams-webhook-url",
+  "onelake_account": "https://onelake.dfs.fabric.microsoft.com",
+  "airflow_variable_env": "dev"
+}

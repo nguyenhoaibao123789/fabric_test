@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 # ── Paths ─────────────────────────────────────────────────────────────
 _HERE = Path(__file__).parent
-_CONFIG = _HERE.parent.parent / "config"  # fabric/dags/../../config
+_CONFIG = _HERE / "config"  # fabric/dags/config/ — synced with git
 
 # ── Load config at parse time ─────────────────────────────────────────
 ENV = Variable.get("environment", default_var="dev")
@@ -44,7 +44,7 @@ _env_config: dict = json.loads((_CONFIG / f"{ENV}.json").read_text())
 _all_sources: list[dict] = json.loads((_CONFIG / "sources.json").read_text())
 _schedules: list[dict] = json.loads((_CONFIG / "schedules.json").read_text())
 
-WORKSPACE_ID = Variable.get("fabric_workspace_id")   # set in Airflow Variables
+WORKSPACE_ID = Variable.get("fabric_workspace_id", default_var="")   # set in Airflow Variables
 GOLD_WAREHOUSE = _env_config["gold_warehouse"]
 
 # ── Default task args ─────────────────────────────────────────────────
@@ -60,7 +60,7 @@ DEFAULT_ARGS = {
 # ── Notebook item IDs (set in Airflow Variables after deploy.py runs) ──
 def notebook_id(name: str) -> str:
     """Look up Fabric item ID for a notebook by its logical name."""
-    return Variable.get(f"notebook_id__{name.replace('/', '__')}")
+    return Variable.get(f"notebook_id__{name.replace('/', '__')}", default_var="")
 
 
 # ── DAG factory ───────────────────────────────────────────────────────
