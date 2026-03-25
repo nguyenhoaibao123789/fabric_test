@@ -4,4 +4,4 @@ spark_env_name = "dev-spark-env"                          # Display name for the
 # Git sync for Airflow DAGs (repo must be public)
 git_repo_url    = "https://github.com/your-org/your-repo"
 git_branch      = "main"
-git_dags_folder = "fabric/dags"
+git_dags_folder = "fabric"

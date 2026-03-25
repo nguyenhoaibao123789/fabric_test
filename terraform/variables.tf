@@ -21,6 +21,6 @@ variable "git_branch" {
 
 variable "git_dags_folder" {
   type        = string
-  description = "Path inside the repo where DAG files live"
-  default     = "fabric/dags"
+  description = "Root folder inside the repo — Fabric expects dags/ and plugins/ subdirectories within this path"
+  default     = "fabric"
 }
