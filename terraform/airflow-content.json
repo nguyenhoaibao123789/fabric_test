@@ -23,8 +23,7 @@
         "gitServiceType": "GitHub",
         "repoUrl": "{{ .git_repo_url }}",
         "branchName": "{{ .git_branch }}",
-        "rootFolder": "{{ .git_dags_folder }}",
-        "connectionId": "{{ .git_connection_id }}"
+        "rootFolder": "{{ .git_dags_folder }}"
       }
     }
   }

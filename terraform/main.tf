@@ -48,33 +48,6 @@ resource "fabric_notebook" "notebooks" {
 }
 
 
-# ── Git Connection ──────────────────────────────────────────────────────────────
-
-resource "fabric_connection" "git_auth" {
-  display_name      = "fabric-airflow-git"
-  connectivity_type = "ShareableCloud"
-
-  connection_details = {
-    type            = "GitHubSourceControl"
-    creation_method = "GitHubSourceControl.Contents"
-    parameters = [
-      {
-        name  = "url"
-        value = var.git_repo_url
-      }
-    ]
-  }
-
-  credential_details = {
-    credential_type = "Key"
-    key_credentials = {
-      key_wo         = var.github_pat
-      key_wo_version = 1
-    }
-  }
-}
-
-
 # ── Airflow ─────────────────────────────────────────────────────────────────────
 
 resource "fabric_apache_airflow_job" "airflow" {
@@ -87,10 +60,9 @@ resource "fabric_apache_airflow_job" "airflow" {
       source          = "${path.module}/airflow-content.json"
       processing_mode = "GoTemplate"
       tokens = {
-        git_repo_url      = var.git_repo_url
-        git_branch        = var.git_branch
-        git_dags_folder   = var.git_dags_folder
-        git_connection_id = fabric_connection.git_auth.id
+        git_repo_url    = var.git_repo_url
+        git_branch      = var.git_branch
+        git_dags_folder = var.git_dags_folder
       }
     }
   }

@@ -24,9 +24,3 @@ variable "git_dags_folder" {
   description = "Path inside the repo where DAG files live"
   default     = "fabric/dags"
 }
-
-variable "github_pat" {
-  type        = string
-  sensitive   = true
-  description = "GitHub Personal Access Token with repo:read scope — stored write-only, never appears in state or logs"
-}
