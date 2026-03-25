@@ -44,7 +44,8 @@ _env_config: dict = json.loads((_CONFIG / f"{ENV}.json").read_text())
 _all_sources: list[dict] = json.loads((_CONFIG / "sources.json").read_text())
 _schedules: list[dict] = json.loads((_CONFIG / "schedules.json").read_text())
 
-WORKSPACE_ID = Variable.get("fabric_workspace_id", default_var="")   # set in Airflow Variables
+WORKSPACE_ID  = Variable.get("fabric_workspace_id", default_var="")   # set in Airflow Variables
+FABRIC_CONN_ID = Variable.get("fabric_conn_id", default_var="fabric_default")
 GOLD_WAREHOUSE = _env_config["gold_warehouse"]
 
 # ── Default task args ─────────────────────────────────────────────────
@@ -118,8 +119,9 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
                 # Bronze: copy raw file into Bronze Lakehouse / Files/
                 bronze = FabricRunItemOperator(
                     task_id=f"bronze_{src['source_name']}",
+                    fabric_conn_id=FABRIC_CONN_ID,
                     workspace_id=WORKSPACE_ID,
-                    fabric_item_id=notebook_id("bronze/ingest_file"),
+                    item_id=notebook_id("bronze/ingest_file"),
                     job_type="RunNotebook",
                     job_params={
                         "configuration": {
@@ -135,8 +137,9 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
                 # Silver 1: validate + clean + MERGE into staging_{source_name}
                 silver1 = FabricRunItemOperator(
                     task_id=f"silver1_{src['source_name']}",
+                    fabric_conn_id=FABRIC_CONN_ID,
                     workspace_id=WORKSPACE_ID,
-                    fabric_item_id=notebook_id(f"silver1/{src['silver1_notebook']}"),
+                    item_id=notebook_id(f"silver1/{src['silver1_notebook']}"),
                     job_type="RunNotebook",
                     job_params={
                         "configuration": {
@@ -161,8 +164,9 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
         for entity, source_names in silver2_entities.items():
             silver2 = FabricRunItemOperator(
                 task_id=f"silver2_{entity}",
+                fabric_conn_id=FABRIC_CONN_ID,
                 workspace_id=WORKSPACE_ID,
-                fabric_item_id=notebook_id(f"silver2/build_{entity}"),
+                item_id=notebook_id(f"silver2/build_{entity}"),
                 job_type="RunNotebook",
                 job_params={
                     "configuration": {
