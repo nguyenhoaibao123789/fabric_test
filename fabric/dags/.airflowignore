@@ -1,6 +1,0 @@
-# .airflowignore — Tell Airflow's DAG scanner to skip these files.
-# Python imports still work normally; this only suppresses DAG scanning.
-# Syntax: one pattern per line (substring match or regex depending on config).
-
-# Helper modules — no DAG objects, but imported by medallion_pipeline.py
-callbacks.py

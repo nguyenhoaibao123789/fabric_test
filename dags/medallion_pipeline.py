@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 # ── Paths ─────────────────────────────────────────────────────────────
 _HERE = Path(__file__).parent
-_CONFIG = _HERE / "config"  # fabric/dags/config/ — synced with git
+_CONFIG = _HERE / "config"  # dags/config/ — synced with git
 
 # ── Load config at parse time ─────────────────────────────────────────
 ENV = Variable.get("environment", default_var="dev")
