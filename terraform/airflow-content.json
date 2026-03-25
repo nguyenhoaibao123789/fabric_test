@@ -17,9 +17,7 @@
         "computeSize": "Small",
         "enableAutoscale": false,
         "enableAvailabilityZones": false,
-        "extraNodes": 0,
-        "poolId": "00000000-0000-0000-0000-000000000000",
-        "poolName": "StarterPool"
+        "extraNodes": 0
       },
       "gitSyncProperties": {
         "gitServiceType": "GitHub",
