@@ -4,14 +4,14 @@ locals {
     "shared_functions" = {
       ipynb_path = "${path.module}/../notebooks/shared/shared_functions.ipynb"
     }
-    "ingest_file" = {
-      ipynb_path = "${path.module}/../notebooks/bronze/ingest_file.ipynb"
+    "bronze_ingest" = {
+      ipynb_path = "${path.module}/../notebooks/bronze/ingest.ipynb"
     }
-    "process_invoice" = {
-      ipynb_path = "${path.module}/../notebooks/silver1/process_invoice.ipynb"
+    "silver1_clean" = {
+      ipynb_path = "${path.module}/../notebooks/silver1/clean.ipynb"
     }
-    "build_carrier_invoice" = {
-      ipynb_path = "${path.module}/../notebooks/silver2/build_carrier_invoice.ipynb"
+    "silver2_combine" = {
+      ipynb_path = "${path.module}/../notebooks/silver2/combine.ipynb"
     }
   }
 }
@@ -47,23 +47,3 @@ resource "fabric_notebook" "notebooks" {
   depends_on = [fabric_environment.spark_env]
 }
 
-
-# ── Airflow ─────────────────────────────────────────────────────────────────────
-
-resource "fabric_apache_airflow_job" "airflow" {
-  workspace_id = var.workspace_id
-  display_name = "dev-medallion-airflow"
-  format       = "Default"
-
-  definition = {
-    "apacheairflowjob-content.json" = {
-      source          = "${path.module}/airflow-content.json"
-      processing_mode = "GoTemplate"
-      tokens = {
-        git_repo_url    = var.git_repo_url
-        git_branch      = var.git_branch
-        git_dags_folder = var.git_dags_folder
-      }
-    }
-  }
-}

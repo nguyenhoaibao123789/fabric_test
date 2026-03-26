@@ -7,20 +7,3 @@ variable "spark_env_name" {
   type        = string
   description = "Display name for the Fabric Spark Environment item"
 }
-
-variable "git_repo_url" {
-  type        = string
-  description = "HTTPS URL of the Git repository containing DAGs (e.g. https://github.com/org/repo)"
-}
-
-variable "git_branch" {
-  type        = string
-  description = "Branch Airflow will sync DAGs from"
-  default     = "main"
-}
-
-variable "git_dags_folder" {
-  type        = string
-  description = "Root folder inside the repo — Fabric expects dags/ and plugins/ subdirectories within this path"
-  default     = "fabric"
-}

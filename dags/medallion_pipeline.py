@@ -60,8 +60,8 @@ DEFAULT_ARGS = {
 
 # ── Notebook item IDs (set in Airflow Variables after deploy.py runs) ──
 def notebook_id(name: str) -> str:
-    """Look up Fabric item ID for a notebook by its logical name."""
-    return Variable.get(f"notebook_id__{name.replace('/', '__')}", default_var="")
+    """Look up Fabric item ID for a notebook by its Airflow Variable key."""
+    return Variable.get(name, default_var="")
 
 
 # ── DAG factory ───────────────────────────────────────────────────────
@@ -81,10 +81,10 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
         log.warning("schedule_group '%s' has no enabled sources — skipping DAG", schedule_group)
         return None
 
-    # Group sources by their silver2_entity for scoped Silver 2 wiring
+    # Group sources by their silver2_table for scoped Silver 2 wiring
     silver2_entities: dict[str, list] = {}
     for src in sources:
-        silver2_entities.setdefault(src["silver2_entity"], []).append(src["source_name"])
+        silver2_entities.setdefault(src["silver2_table"], []).append(src["source_name"])
 
     @dag(
         dag_id=dag_id,
@@ -121,7 +121,7 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
                     task_id=f"bronze_{src['source_name']}",
                     fabric_conn_id=FABRIC_CONN_ID,
                     workspace_id=WORKSPACE_ID,
-                    item_id=notebook_id("bronze/ingest_file"),
+                    item_id=notebook_id("notebook_id__bronze_ingest"),
                     job_type="RunNotebook",
                     job_params={
                         "configuration": {
@@ -139,7 +139,7 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
                     task_id=f"silver1_{src['source_name']}",
                     fabric_conn_id=FABRIC_CONN_ID,
                     workspace_id=WORKSPACE_ID,
-                    item_id=notebook_id(f"silver1/{src['silver1_notebook']}"),
+                    item_id=notebook_id("notebook_id__silver1_clean"),
                     job_type="RunNotebook",
                     job_params={
                         "configuration": {
@@ -166,7 +166,7 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
                 task_id=f"silver2_{entity}",
                 fabric_conn_id=FABRIC_CONN_ID,
                 workspace_id=WORKSPACE_ID,
-                item_id=notebook_id(f"silver2/build_{entity}"),
+                item_id=notebook_id("notebook_id__silver2_combine"),
                 job_type="RunNotebook",
                 job_params={
                     "configuration": {
@@ -186,23 +186,23 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
             silver2_task_by_entity[entity] = silver2
 
         # ── Phase 4: Gold — dbt run ────────────────────────────────────
-        # Gold depends only on Silver 2 entities where feeds_gold=true in sources.json.
+        # Gold depends only on Silver 2 entities where gold_table is set in sources.json.
         # This means Gold triggers as soon as its required entities succeed —
         # it does NOT wait for unrelated Silver 2 entities in the same DAG.
-        gold_entities = {
-            s["silver2_entity"]
+        gold_tables = {
+            s["silver2_table"]
             for s in sources
-            if s.get("feeds_gold", False)
+            if s.get("gold_table")
         }
         gold_upstream = [
             silver2_task_by_entity[e]
-            for e in gold_entities
+            for e in gold_tables
             if e in silver2_task_by_entity
         ]
 
         if not gold_upstream:
             log.warning(
-                "No feeds_gold=true sources found for schedule_group '%s' — "
+                "No gold_table sources found for schedule_group '%s' — "
                 "Gold task will not be added to this DAG.",
                 schedule_group,
             )

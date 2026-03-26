@@ -27,10 +27,10 @@ environments:
 # deploy.py reads this to know what to upload.
 
 notebooks:
-  shared_functions:       notebooks/shared/shared_functions.ipynb
-  ingest_file:            notebooks/bronze/ingest_file.ipynb
-  process_invoice:        notebooks/silver1/process_invoice.ipynb
-  build_carrier_invoice:  notebooks/silver2/build_carrier_invoice.ipynb
+  shared_functions:  notebooks/shared/shared_functions.ipynb
+  bronze_ingest:     notebooks/bronze/ingest.ipynb
+  silver1_clean:     notebooks/silver1/clean.ipynb
+  silver2_combine:   notebooks/silver2/combine.ipynb
 
 # ── dbt Gold layer ────────────────────────────────────────────────────────────
 dbt_project: dbt/

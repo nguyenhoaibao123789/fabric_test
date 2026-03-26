@@ -14,7 +14,7 @@ Client uploads here            Immutable raw archive        Delta tables        
                                                             build_carrier_invoice.py
 ```
 
-Orchestrated by **Managed Airflow** (created by Terraform). DAGs are synced directly from this Git repository — no manual file uploads needed. Gold (`dbt run`) triggers as soon as its upstream Silver 2 entity succeeds — it does not wait for unrelated Silver 2 tasks.
+Orchestrated by **Apache Airflow Job** (created by Terraform). DAGs are synced directly from this Git repository via Git sync — no manual file uploads needed. Gold (`dbt run`) triggers as soon as its upstream Silver 2 entity succeeds.
 
 ---
 
@@ -22,22 +22,20 @@ Orchestrated by **Managed Airflow** (created by Terraform). DAGs are synced dire
 
 ```
 terraform apply
-  ├── fabric_environment          Spark Environment (packages installed separately via deploy.py)
+  ├── fabric_environment          Spark Environment
   ├── fabric_notebook [x4]        shared_functions, ingest_file, process_invoice, build_carrier_invoice
-  └── fabric_apache_airflow_job   Airflow instance + Git sync to this repo
+  └── fabric_apache_airflow_job   Airflow instance (Git sync configured separately via portal UI)
 ```
 
-Everything else (Lakehouse, Data Warehouse, Gold DDL) is created once manually.
+Everything else (Lakehouse, Data Warehouse, Gold DDL, Git sync, Airflow Variables) is set up manually.
 
 ---
 
 ## First-Time Setup
 
-Complete these steps in order on a fresh environment.
-
 ### Step 1 — Create resources in the Fabric UI
 
-Log in to [app.fabric.microsoft.com](https://app.fabric.microsoft.com) and create the following items manually inside a new workspace named `dev-fabric-data`:
+Log in to [app.fabric.microsoft.com](https://app.fabric.microsoft.com) and create:
 
 | Item | Type | Name |
 |---|---|---|
@@ -45,11 +43,9 @@ Log in to [app.fabric.microsoft.com](https://app.fabric.microsoft.com) and creat
 | Medallion storage | Lakehouse | `fabric_lakehouse` |
 | Gold storage | Data Warehouse | `fabric_gold_warehouse` |
 
-> Airflow is created by Terraform in Step 5 — do not create it manually.
-
 ### Step 2 — Create landing zone folders
 
-Inside `fabric_lakehouse` → `Files/`, create these folders manually via the Lakehouse UI:
+Inside `fabric_lakehouse` → `Files/`, create these folders manually:
 
 ```
 Files/
@@ -57,13 +53,13 @@ Files/
 │   ├── fedex/invoice/
 │   ├── dhl/invoice/
 │   └── ups/carrier/
-├── bronze/          ← pipeline creates subfolders automatically
-└── shared/          ← shared_functions.py goes here (deploy.py uploads it)
+├── bronze/
+└── shared/
 ```
 
 ### Step 3 — Fill in config files
 
-**`config/dev.json`** — workspace name and Gold Warehouse SQL endpoint:
+**`dags/config/dev.json`** — workspace name and Gold Warehouse SQL endpoint:
 ```json
 {
   "workspace_name": "dev-fabric-data",
@@ -73,18 +69,11 @@ Files/
 }
 ```
 
-> The workspace ID is visible in the browser URL when you are inside the workspace:
-> `https://app.fabric.microsoft.com/groups/<workspace-id>/...`
+> The workspace ID is in the browser URL: `https://app.fabric.microsoft.com/groups/<workspace-id>/...`
 
 ### Step 4 — Run the Gold Warehouse DDL
 
-Open `fabric_gold_warehouse` in the Fabric UI → SQL editor, then run:
-
-```
-warehouse/create_tables.sql
-```
-
-This creates the Gold dimension and fact tables with `IDENTITY` primary keys. **Do this before triggering the pipeline for the first time.** dbt will not create these tables itself — it only merges into them.
+Open `fabric_gold_warehouse` → SQL editor, run `warehouse/create_tables.sql`.
 
 > **Never run `dbt run --full-refresh` in production** — it drops and recreates tables, losing `IDENTITY` definitions.
 
@@ -101,20 +90,14 @@ nbstripout --install          # register git filter for .ipynb files (run once)
 
 ### Step 6 — Install Terraform and Azure CLI
 
-These are system tools, not Python packages — install them separately:
-
 - **Terraform** >= 1.6 → [developer.hashicorp.com/terraform/install](https://developer.hashicorp.com/terraform/install)
 - **Azure CLI** → [learn.microsoft.com/en-us/cli/azure/install-azure-cli](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
-
-Then log in once with your Fabric account (same credentials as `app.fabric.microsoft.com`):
 
 ```bash
 az login
 ```
 
 ### Step 7 — Create your Terraform variables file
-
-Copy the example and fill in your values:
 
 ```bash
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
@@ -123,14 +106,12 @@ cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 Edit `terraform/terraform.tfvars`:
 
 ```hcl
-workspace_id   = "<workspace-id>"          # from the Fabric portal URL
-spark_env_name = "medallion-env-dev"
+workspace_id   = "<workspace-id>"
+spark_env_name = "dev-spark-env"
 
-# Git sync — Airflow pulls DAGs directly from this repo
-git_repo_url      = "https://github.com/your-org/your-repo"
-git_branch        = "main"
-git_dags_folder   = "fabric/dags"
-git_connection_id = ""                     # leave empty for public repos
+git_repo_url    = "https://github.com/your-org/your-repo.git"
+git_branch      = "main"
+git_dags_folder = "fabric"
 ```
 
 > `terraform.tfvars` is gitignored — never commit it.
@@ -143,59 +124,82 @@ terraform init
 terraform apply
 ```
 
-This creates:
-- Fabric Spark Environment
-- All 4 notebooks
-- Managed Airflow instance with Git sync pointed at `fabric/dags/`
+This creates the Spark Environment, all 4 notebooks, and the Airflow job.
 
-After `apply` completes, note the output values — you will need the notebook IDs in the next step.
-
-### Step 9 — Install Spark environment libraries
-
-The Fabric Terraform provider does not support PyPI library management. Run `deploy.py` to install packages from `config/notebook_requirements.txt` into the Spark environment:
+After apply, get the notebook IDs:
 
 ```bash
-cd ..   # back to repo root
-python deploy.py --env dev
+terraform output airflow_variables
 ```
 
-This also sets the required Airflow Variables automatically (see list below).
+### Step 9 — Configure Git sync on the Airflow job
 
-### Step 10 — Set Airflow Variables
+In the Fabric portal, open the Airflow job → **Settings → File storage → Git sync**:
 
-`deploy.py` sets most variables automatically. Verify in the Airflow UI (**Admin → Variables**) that these are present:
+| Field | Value |
+|---|---|
+| Git service type | Github |
+| Git credential type | None (public repo) |
+| Repository | `https://github.com/your-org/your-repo.git` |
+| Branch | `main` |
+
+Click **Apply**. Airflow will sync DAGs from `dags/` in the repo.
+
+### Step 10 — Configure Airflow environment
+
+In the Fabric portal → Airflow job → **Settings → Environment configuration**:
+
+**Apache Airflow requirements:**
+```
+apache-airflow-microsoft-fabric-plugin
+```
+
+Click **Apply**, then **Stop** and **Start** the Airflow job.
+
+### Step 11 — Create Fabric connection in Airflow
+
+In the Airflow UI (**Monitor Airflow** → **Admin → Connections → + Add**):
+
+| Field | Value |
+|---|---|
+| Conn Id | `fabric_default` |
+| Conn Type | Microsoft Fabric |
+| Tenant ID | your Azure tenant ID |
+| Client ID | your Service Principal client ID |
+| Client Secret | your Service Principal secret |
+
+### Step 12 — Set Airflow Variables
+
+In the Airflow UI → **Admin → Variables**, add:
 
 | Variable | Value |
 |---|---|
-| `fabric_workspace_id` | workspace GUID |
-| `notebook_id__bronze__ingest_file` | from `terraform output` |
-| `notebook_id__silver1__process_invoice` | from `terraform output` |
-| `notebook_id__silver2__build_carrier_invoice` | from `terraform output` |
-| `environment` | `dev` |
-| `dbt_project_dir` | `/opt/airflow/dags/dbt` |
+| `fabric_workspace_id` | your workspace GUID |
+| `notebook_id__bronze__ingest_file` | from `terraform output airflow_variables` |
+| `notebook_id__silver1__process_invoice` | from `terraform output airflow_variables` |
+| `notebook_id__silver2__build_carrier_invoice` | from `terraform output airflow_variables` |
+| `dbt_project_dir` | `/opt/airflow/git/<repo-name>.git/dags/dbt` |
 | `dbt_warehouse_server` | `<workspace-id>.datawarehouse.fabric.microsoft.com` |
-| `lakehouse` | `fabric_lakehouse` |
-| `azure_tenant_id` | Service principal tenant ID |
-| `azure_client_id` | Service principal app (client) ID |
-| `azure_client_secret` | Service principal secret |
+| `azure_tenant_id` | your Azure tenant ID |
+| `azure_client_id` | your Service Principal client ID |
+| `azure_client_secret` | your Service Principal secret |
 
 ---
 
 ## Re-deploying after changes
 
-| Change | Command |
+| Change | Action |
 |---|---|
 | Notebook code changed | `terraform apply` |
-| DAG or dbt model changed | `git push` — Git sync picks it up automatically |
+| DAG, config, or dbt model changed | `git push` — Git sync picks it up automatically |
 | New source added (`sources.json`) | Update file → `git push` |
-| Added/removed Spark packages (`notebook_requirements.txt`) | `python deploy.py --env dev` |
-| Gold schema changed | Update `create_tables.sql` → run DDL manually in Gold Warehouse SQL editor |
+| Gold schema changed | Update `warehouse/create_tables.sql` → run DDL manually |
 
 ---
 
 ## dbt Gold Layer
 
-The Silver → Gold transformation runs via **dbt** (`dbt-fabric` adapter) inside Airflow. To run it locally for testing:
+To run locally for testing:
 
 ```bash
 export DBT_WAREHOUSE_SERVER="<workspace-id>.datawarehouse.fabric.microsoft.com"
@@ -203,7 +207,7 @@ export AZURE_TENANT_ID="..."
 export AZURE_CLIENT_ID="..."
 export AZURE_CLIENT_SECRET="..."
 
-cd fabric/dags/dbt
+cd dags/dbt
 dbt deps                              # first time only
 dbt run  --profiles-dir . --target dev
 dbt test --profiles-dir . --target dev
@@ -215,43 +219,38 @@ dbt test --profiles-dir . --target dev
 
 ```
 fabric_test/
-├── deploy.py                         # Installs Spark libraries + sets Airflow Variables
-├── fabric.yaml                       # Project metadata
-├── config/
-│   ├── dev.json                      # workspace name, lakehouse name, endpoints
-│   ├── prod.json                     # create manually — do not commit
-│   ├── sources.json                  # one entry per carrier/file type
-│   ├── schedules.json                # DAG schedule groups and cron expressions
-│   ├── notebook_requirements.txt     # pip packages installed in the Fabric Spark Environment
-│   └── resource_ids_dev.json         # workspace_id only — airflow_id now comes from terraform output
+├── dags/                             # Git-synced to Airflow automatically on push
+│   ├── medallion_pipeline.py         # DAG factory — one DAG per schedule group
+│   ├── callbacks.py                  # Teams failure/SLA alerts
+│   ├── requirements.txt              # (unused by Fabric — set packages via portal UI)
+│   ├── config/
+│   │   ├── dev.json                  # workspace name, lakehouse name, endpoints
+│   │   ├── sources.json              # one entry per carrier/file type
+│   │   └── schedules.json            # DAG schedule groups and cron expressions
+│   └── dbt/                          # Gold layer (dbt-fabric adapter)
+│       ├── dbt_project.yml
+│       ├── profiles.yml
+│       ├── packages.yml
+│       └── models/
+│           ├── sources.yml
+│           └── gold/
+│               ├── dim_carrier.sql
+│               ├── dim_service_type.sql
+│               ├── dim_date.sql
+│               ├── fact_invoice.sql
+│               └── schema.yml
+├── notebooks/                        # Uploaded to Fabric via Terraform
+│   ├── shared/shared_functions.ipynb
+│   ├── bronze/ingest_file.ipynb
+│   ├── silver1/process_invoice.ipynb
+│   └── silver2/build_carrier_invoice.ipynb
 ├── terraform/
-│   ├── providers.tf                  # microsoft/fabric provider, preview mode enabled
-│   ├── variables.tf                  # workspace_id, spark_env_name, git_* variables
+│   ├── providers.tf                  # microsoft/fabric provider
+│   ├── variables.tf
 │   ├── main.tf                       # Spark Environment, Notebooks, Airflow Job
-│   ├── outputs.tf                    # environment_id, airflow_id, airflow_variables
-│   ├── airflow-content.json          # Airflow Job definition (Git sync config)
-│   └── terraform.tfvars.example      # copy to terraform.tfvars and fill in values
-├── fabric/
-│   ├── notebooks/
-│   │   ├── shared/shared_functions.ipynb
-│   │   ├── bronze/ingest_file.ipynb
-│   │   ├── silver1/process_invoice.ipynb
-│   │   └── silver2/build_carrier_invoice.ipynb
-│   └── dags/                         # Git sync root → Airflow picks up changes on push
-│       ├── medallion_pipeline.py     # DAG factory — one DAG per schedule group
-│       ├── callbacks.py              # Teams failure/SLA alerts
-│       └── dbt/                      # Gold layer (dbt-fabric adapter)
-│           ├── dbt_project.yml
-│           ├── profiles.yml
-│           ├── packages.yml
-│           └── models/
-│               ├── sources.yml
-│               └── gold/
-│                   ├── dim_carrier.sql
-│                   ├── dim_service_type.sql
-│                   ├── dim_date.sql
-│                   ├── fact_invoice.sql
-│                   └── schema.yml
+│   ├── outputs.tf                    # notebook IDs via airflow_variables output
+│   ├── airflow-content.json          # Airflow Job definition
+│   └── terraform.tfvars.example
 └── warehouse/
     └── create_tables.sql             # run once manually in Gold Warehouse SQL editor
 ```
@@ -266,9 +265,6 @@ fabric_lakehouse/
 │   │   ├── dhl/invoice/
 │   │   └── ups/carrier/
 │   ├── bronze/                       ← pipeline archives files here (never deleted)
-│   │   ├── fedex/invoice/
-│   │   ├── dhl/invoice/
-│   │   └── ups/carrier/
 │   └── shared/
 │       └── shared_functions.py
 └── Tables/
@@ -283,8 +279,7 @@ fabric_lakehouse/
 
 ## Notes
 
-- `terraform/terraform.tfvars` and `config/prod.json` are gitignored — never commit them.
-- Airflow is now fully managed by Terraform — do not create or delete it manually in the Fabric portal.
-- The Terraform provider does not support PyPI library installation — always run `deploy.py` after `terraform apply` to install Spark packages.
-- The exact JSON field names in `terraform/airflow-content.json` (Git sync config) may need adjustment if the Fabric API changes — check Microsoft docs if `terraform apply` returns a 400 on the Airflow resource.
-- Gold layer is fully managed by dbt — see `fabric/dags/dbt/models/gold/`.
+- `terraform/terraform.tfvars` is gitignored — never commit it.
+- Git sync is configured via the Fabric portal UI (Settings → File storage) — `gitSyncProperties` in the Terraform definition JSON is stored but not acted on by Fabric.
+- Spark package installation is not supported by the Terraform provider — add packages via the portal (Settings → Environment configuration → Apache Airflow requirements).
+- Gold layer is fully managed by dbt — see `dags/dbt/models/gold/`.
