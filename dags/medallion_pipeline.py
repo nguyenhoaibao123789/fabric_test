@@ -152,6 +152,9 @@ def create_medallion_dag(subject: dict):
                 deferrable=True,
             )
 
+            bronze.ui_color  = "#faebd4"; bronze.ui_fgcolor  = "#4d2c00"
+            silver1.ui_color = "#e8f4ff"; silver1.ui_fgcolor = "#1a4a80"
+
             bronze >> silver1
             silver1_task_by_source[src["source_name"]] = silver1
 
@@ -178,6 +181,8 @@ def create_medallion_dag(subject: dict):
                 },
                 deferrable=True,
             )
+
+            silver2.ui_color  = "#eae8fd"; silver2.ui_fgcolor = "#302880"
 
             # Wire: all silver1 tasks for this entity → silver2
             upstream_tasks = [silver1_task_by_source[sn] for sn in source_names]
@@ -228,6 +233,8 @@ def create_medallion_dag(subject: dict):
             append_env=True,
             on_failure_callback=on_failure_teams_alert,
         )
+
+        gold.ui_color  = "#fff8e0"; gold.ui_fgcolor = "#7a5800"
 
         gold_upstream >> gold
 
