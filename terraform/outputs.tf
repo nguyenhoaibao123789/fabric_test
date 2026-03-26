@@ -6,8 +6,8 @@ output "environment_id" {
 output "airflow_variables" {
   description = "Airflow Variables to set after terraform apply"
   value = {
-    notebook_id__bronze_ingest   = fabric_notebook.notebooks["bronze_ingest"].id
-    notebook_id__silver1_clean   = fabric_notebook.notebooks["silver1_clean"].id
-    notebook_id__silver2_combine = fabric_notebook.notebooks["silver2_combine"].id
+    bronze_ingest_file = fabric_notebook.notebooks["bronze_ingest_file"].id
+    silver1_clean      = fabric_notebook.notebooks["silver1_clean"].id
+    silver2_combine    = fabric_notebook.notebooks["silver2_combine"].id
   }
 }

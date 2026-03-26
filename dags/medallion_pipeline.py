@@ -1,19 +1,20 @@
 """
 Fabric Managed Airflow — Medallion Pipeline DAG Factory
 =========================================================
-Reads config/schedules.json and config/sources.json at parse time.
-Generates one independent DAG per schedule group — each DAG processes
-only the sources assigned to that group.
+Reads config/sources.yaml at parse time.
+Generates one independent DAG per subject — each DAG processes
+only the sources belonging to that subject.
 
 DAGs produced (example):
-  medallion_morning_batch   → cron: 0 6 * * *
-  medallion_hourly          → cron: 0 * * * *
-  medallion_weekly_sunday   → cron: 0 6 * * 0
+  medallion_carrier_invoice   → cron: 0 6 * * *
+  medallion_carrier_tracking  → cron: 0 * * * *
+  medallion_rate_card         → cron: 0 6 * * 0
 
-Adding a new schedule: add a row to schedules.json, no code change needed.
-Adding a new source:   add a row to sources.json,   no code change needed.
+Adding a new subject/schedule: add a subject block to sources.yaml, no code change needed.
+Adding a new source:           add a source entry under the relevant subject, no code change needed.
 """
 import json
+import yaml
 import logging
 import os
 from datetime import datetime, timedelta
@@ -40,9 +41,8 @@ _CONFIG = _HERE / "config"  # dags/config/ — synced with git
 # ── Load config at parse time ─────────────────────────────────────────
 ENV = Variable.get("environment", default_var="dev")
 
-_env_config: dict = json.loads((_CONFIG / f"{ENV}.json").read_text())
-_all_sources: list[dict] = json.loads((_CONFIG / "sources.json").read_text())
-_schedules: list[dict] = json.loads((_CONFIG / "schedules.json").read_text())
+_env_config: dict = yaml.safe_load((_CONFIG / f"{ENV}.yaml").read_text())
+_subjects: list[dict] = yaml.safe_load((_CONFIG / "sources.yaml").read_text())["subjects"]
 
 WORKSPACE_ID  = Variable.get("fabric_workspace_id", default_var="")   # set in Airflow Variables
 FABRIC_CONN_ID = Variable.get("fabric_conn_id", default_var="fabric_default")
@@ -65,20 +65,23 @@ def notebook_id(name: str) -> str:
 
 
 # ── DAG factory ───────────────────────────────────────────────────────
-def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
+def create_medallion_dag(subject: dict):
     """
-    Build one Airflow DAG for the given schedule_group.
-    Only sources where source['schedule_group'] == schedule_group are included.
+    Build one Airflow DAG for the given subject.
+    Only sources in subject['sources'] that are enabled for the current ENV are included.
     """
+    subject_name = subject["subject"]
+    dag_id = subject["dag_id"]
+    cron = subject["cron"]
+
     sources = [
-        s for s in _all_sources
-        if s["schedule_group"] == schedule_group
-        and s["is_enabled"]
-        and s["environment"] == ENV
+        s for s in subject["sources"]
+        if s.get("is_enabled", True)
+        and s.get("environment", ENV) == ENV
     ]
 
     if not sources:
-        log.warning("schedule_group '%s' has no enabled sources — skipping DAG", schedule_group)
+        log.warning("subject '%s' has no enabled sources — skipping DAG", subject_name)
         return None
 
     # Group sources by their silver2_table for scoped Silver 2 wiring
@@ -93,9 +96,9 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
         default_args=DEFAULT_ARGS,
         catchup=False,
         sla_miss_callback=on_sla_miss_teams_alert,
-        tags=["medallion", "fabric", ENV, schedule_group],
+        tags=["medallion", "fabric", ENV, subject_name],
         doc_md=f"""
-            ## Medallion Pipeline — {schedule_group}
+            ## Medallion Pipeline — {subject_name}
 
             **Schedule:** `{cron}`
             **Sources:** {len(sources)}
@@ -103,7 +106,7 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
 
             Each source runs Bronze → Silver 1 independently in parallel.
             Silver 2 per entity runs after all its Silver 1 sources succeed (all_success).
-            Gold runs once after its upstream Silver 2 tasks (feeds_gold=true) succeed — does not wait for unrelated Silver 2 tasks.
+            Gold runs once after its upstream Silver 2 tasks succeed — does not wait for unrelated Silver 2 tasks.
                 """,
     )
     def dag_fn():
@@ -121,7 +124,7 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
                     task_id=f"bronze_{src['source_name']}",
                     fabric_conn_id=FABRIC_CONN_ID,
                     workspace_id=WORKSPACE_ID,
-                    item_id=notebook_id("notebook_id__bronze_ingest"),
+                    item_id=notebook_id("bronze_ingest_file"),
                     job_type="RunNotebook",
                     job_params={
                         "configuration": {
@@ -139,7 +142,7 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
                     task_id=f"silver1_{src['source_name']}",
                     fabric_conn_id=FABRIC_CONN_ID,
                     workspace_id=WORKSPACE_ID,
-                    item_id=notebook_id("notebook_id__silver1_clean"),
+                    item_id=notebook_id("silver1_clean"),
                     job_type="RunNotebook",
                     job_params={
                         "configuration": {
@@ -166,7 +169,7 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
                 task_id=f"silver2_{entity}",
                 fabric_conn_id=FABRIC_CONN_ID,
                 workspace_id=WORKSPACE_ID,
-                item_id=notebook_id("notebook_id__silver2_combine"),
+                item_id=notebook_id("silver2_combine"),
                 job_type="RunNotebook",
                 job_params={
                     "configuration": {
@@ -202,9 +205,9 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
 
         if not gold_upstream:
             log.warning(
-                "No gold_table sources found for schedule_group '%s' — "
+                "No gold_table sources found for subject '%s' — "
                 "Gold task will not be added to this DAG.",
-                schedule_group,
+                subject_name,
             )
             return
 
@@ -235,13 +238,9 @@ def create_medallion_dag(schedule_group: str, cron: str, dag_id: str):
     return dag_fn()
 
 
-# ── Generate one DAG per schedule group ───────────────────────────────
+# ── Generate one DAG per subject ──────────────────────────────────────
 # Airflow discovers any DAG object assigned at module level.
-for _sched in _schedules:
-    _dag_obj = create_medallion_dag(
-        schedule_group=_sched["schedule_group"],
-        cron=_sched["cron"],
-        dag_id=_sched["dag_id"],
-    )
+for _subject in _subjects:
+    _dag_obj = create_medallion_dag(_subject)
     if _dag_obj is not None:
-        globals()[_sched["dag_id"]] = _dag_obj
+        globals()[_subject["dag_id"]] = _dag_obj

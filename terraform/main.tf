@@ -4,7 +4,7 @@ locals {
     "shared_functions" = {
       ipynb_path = "${path.module}/../notebooks/shared/shared_functions.ipynb"
     }
-    "bronze_ingest" = {
+    "bronze_ingest_file" = {
       ipynb_path = "${path.module}/../notebooks/bronze/ingest.ipynb"
     }
     "silver1_clean" = {
