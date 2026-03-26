@@ -51,23 +51,23 @@ subjects:
         is_enabled: true
         environment: dev
 
-  - subject: carrier_tracking
-    dag_id: medallion_carrier_tracking
-    cron: "0 * * * *"
-    description: Hourly near-real-time tracking feeds
-    sources:
-      - source_name: usps_tracking
-        carrier: usps
-        landing_path: landing/usps/tracking/
-        bronze_path: bronze/usps/tracking/
-        bronze_file_pattern: "*.parquet"
-        silver1_table: staging_usps_tracking
-        silver2_table: carrier_tracking
-        gold_table: null
-        extra_params:
-          date_cols: [scan_date, delivery_date]
-        is_enabled: true
-        environment: dev
+  # - subject: carrier_tracking
+  #   dag_id: medallion_carrier_tracking
+  #   cron: "0 * * * *"
+  #   description: Hourly near-real-time tracking feeds
+  #   sources:
+  #     - source_name: usps_tracking
+  #       carrier: usps
+  #       landing_path: landing/usps/tracking/
+  #       bronze_path: bronze/usps/tracking/
+  #       bronze_file_pattern: "*.parquet"
+  #       silver1_table: staging_usps_tracking
+  #       silver2_table: carrier_tracking
+  #       gold_table: null
+  #       extra_params:
+  #         date_cols: [scan_date, delivery_date]
+  #       is_enabled: true
+  #       environment: dev
 
   - subject: rate_card
     dag_id: medallion_rate_card
