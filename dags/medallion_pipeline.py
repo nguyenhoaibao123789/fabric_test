@@ -23,7 +23,6 @@ from pathlib import Path
 from airflow.decorators import dag, task
 from airflow.models import Variable
 from airflow.operators.bash import BashOperator
-from airflow.utils.task_group import TaskGroup
 from airflow.operators.empty import EmptyOperator
 
 # Fabric custom operators — installed in the Managed Airflow environment
@@ -117,46 +116,43 @@ def create_medallion_dag(subject: dict):
 
         # ── Phase 1 + 2: Bronze + Silver 1 per source ─────────────────
         for src in sources:
-            with TaskGroup(group_id=f"group_{src['source_name']}") as grp:
-
-                # Bronze: copy raw file into Bronze Lakehouse / Files/
-                bronze = FabricRunItemOperator(
-                    task_id=f"bronze_{src['source_name']}",
-                    fabric_conn_id=FABRIC_CONN_ID,
-                    workspace_id=WORKSPACE_ID,
-                    item_id=notebook_id("bronze_ingest_file"),
-                    job_type="RunNotebook",
-                    job_params={
-                        "configuration": {
-                            "parameters": {
-                                "source_config": json.dumps(src),
-                                "env": ENV,
-                            }
+            # Bronze: copy raw file into Bronze Lakehouse / Files/
+            bronze = FabricRunItemOperator(
+                task_id=f"src_to_brz__{src['source_name']}",
+                fabric_conn_id=FABRIC_CONN_ID,
+                workspace_id=WORKSPACE_ID,
+                item_id=notebook_id("bronze_ingest_file"),
+                job_type="RunNotebook",
+                job_params={
+                    "configuration": {
+                        "parameters": {
+                            "source_config": json.dumps(src),
+                            "env": ENV,
                         }
-                    },
-                    deferrable=True,
-                )
+                    }
+                },
+                deferrable=True,
+            )
 
-                # Silver 1: validate + clean + MERGE into staging_{source_name}
-                silver1 = FabricRunItemOperator(
-                    task_id=f"silver1_{src['source_name']}",
-                    fabric_conn_id=FABRIC_CONN_ID,
-                    workspace_id=WORKSPACE_ID,
-                    item_id=notebook_id("silver1_clean"),
-                    job_type="RunNotebook",
-                    job_params={
-                        "configuration": {
-                            "parameters": {
-                                "source_config": json.dumps(src),
-                                "env": ENV,
-                            }
+            # Silver 1: validate + clean + MERGE into staging_{source_name}
+            silver1 = FabricRunItemOperator(
+                task_id=f"brz_to_sil1__{src['source_name']}",
+                fabric_conn_id=FABRIC_CONN_ID,
+                workspace_id=WORKSPACE_ID,
+                item_id=notebook_id("silver1_clean"),
+                job_type="RunNotebook",
+                job_params={
+                    "configuration": {
+                        "parameters": {
+                            "source_config": json.dumps(src),
+                            "env": ENV,
                         }
-                    },
-                    deferrable=True,
-                )
+                    }
+                },
+                deferrable=True,
+            )
 
-                bronze >> silver1
-
+            bronze >> silver1
             silver1_task_by_source[src["source_name"]] = silver1
 
         # ── Phase 3: Silver 2 per entity ──────────────────────────────
@@ -166,7 +162,7 @@ def create_medallion_dag(subject: dict):
 
         for entity, source_names in silver2_entities.items():
             silver2 = FabricRunItemOperator(
-                task_id=f"silver2_{entity}",
+                task_id=f"sil1_to_sil2__{entity}",
                 fabric_conn_id=FABRIC_CONN_ID,
                 workspace_id=WORKSPACE_ID,
                 item_id=notebook_id("silver2_combine"),
@@ -212,7 +208,7 @@ def create_medallion_dag(subject: dict):
             return
 
         gold = BashOperator(
-            task_id="gold_fact_invoice",
+            task_id="silver2_to_gold",
             bash_command=(
                 "set -e && "
                 "cd \"${DBT_PROJECT_DIR}\" && "
