@@ -13,6 +13,7 @@ DAGs produced (example):
 Adding a new subject/schedule: add a subject block to sources.yaml, no code change needed.
 Adding a new source:           add a source entry under the relevant subject, no code change needed.
 """
+import functools
 import json
 import yaml
 import logging
@@ -28,29 +29,30 @@ from airflow.operators.bash import BashOperator
 # Fabric custom operators — installed in the Managed Airflow environment
 # pip install apache-airflow-microsoft-fabric-plugin
 from apache_airflow_microsoft_fabric_plugin.operators.fabric import FabricRunItemOperator
+from apache_airflow_microsoft_fabric_plugin.hooks.fabric import FabricHook
 
 from callbacks import on_failure_teams_alert, on_sla_miss_teams_alert
 
 log = logging.getLogger(__name__)
 
 # ── Paths ─────────────────────────────────────────────────────────────
-_HERE = Path(__file__).parent
-_CONFIG = _HERE / "config"  # dags/config/ — synced with git
+here = Path(__file__).parent
+config_path = here / "config"  # dags/config/ — synced with git
 
 # ── Load config at parse time ─────────────────────────────────────────
-ENV = Variable.get("environment", default_var="dev")
+env = Variable.get("environment", default_var="dev")
 
-_env_config: dict = yaml.safe_load((_CONFIG / f"{ENV}.yaml").read_text())
-_sources_cfg: dict    = yaml.safe_load((_CONFIG / "sources.yaml").read_text())
-_subjects:    list[dict] = _sources_cfg["subjects"]
-_gold_tables: list[dict] = _sources_cfg.get("gold_tables", [])
+env_config: dict     = yaml.safe_load((config_path / f"{env}.yaml").read_text())
+sources_cfg: dict    = yaml.safe_load((config_path / "sources.yaml").read_text())
+subjects:    list[dict] = sources_cfg["subjects"]
+gold_tables: list[dict] = sources_cfg.get("gold_tables", [])
 
-WORKSPACE_ID  = Variable.get("fabric_workspace_id", default_var="")   # set in Airflow Variables
-FABRIC_CONN_ID = Variable.get("fabric_conn_id", default_var="fabric_default")
-GOLD_WAREHOUSE = _env_config["gold_warehouse"]
+workspace_id  = env_config["fabric_workspace_id"]
+fabric_conn_id = env_config["fabric_conn_id"]
+gold_warehouse = env_config["gold_warehouse"]
 
 # ── Default task args ─────────────────────────────────────────────────
-DEFAULT_ARGS = {
+default_args = {
     "retries": 3,
     "retry_delay": timedelta(minutes=5),
     "retry_exponential_backoff": True,
@@ -59,17 +61,43 @@ DEFAULT_ARGS = {
 }
 
 
-# ── Notebook item IDs (set in Airflow Variables after deploy.py runs) ──
+# ── Notebook item IDs — resolved at parse time via Fabric REST API ────
+@functools.lru_cache(maxsize=1)
+def notebook_map() -> dict[str, str]:
+    """
+    Fetch all Notebook items from the workspace once per module import.
+    Returns {displayName: itemId}.
+    Uses the existing Fabric connection (fabric_conn_id) — no extra credentials needed.
+    """
+    if not workspace_id:
+        log.warning("fabric_workspace_id is empty in env config — notebook IDs will be empty")
+        return {}
+
+    hook    = FabricHook(fabric_conn_id=fabric_conn_id)
+    session = hook.get_conn()   # requests.Session with Bearer token already set
+
+    url  = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/items"
+    resp = session.get(url, params={"type": "Notebook"}, timeout=30)
+    resp.raise_for_status()
+
+    mapping = {item["displayName"]: item["id"] for item in resp.json().get("value", [])}
+    log.info("Resolved %d notebooks from Fabric workspace", len(mapping))
+    return mapping
+
+
 def notebook_id(name: str) -> str:
-    """Look up Fabric item ID for a notebook by its Airflow Variable key."""
-    return Variable.get(name, default_var="")
+    """Return the Fabric item ID for a notebook by its display name."""
+    item_id = notebook_map().get(name, "")
+    if not item_id:
+        log.warning("Notebook '%s' not found in workspace — task will fail at runtime", name)
+    return item_id
 
 
 # ── DAG factory ───────────────────────────────────────────────────────
 def create_medallion_dag(subject: dict):
     """
     Build one Airflow DAG for the given subject.
-    Only sources in subject['sources'] that are enabled for the current ENV are included.
+    Only sources in subject['sources'] that are enabled for the current env are included.
     """
     subject_name = subject["subject"]
     dag_id = subject["dag_id"]
@@ -78,7 +106,7 @@ def create_medallion_dag(subject: dict):
     sources = [
         s for s in subject["sources"]
         if s.get("is_enabled", True)
-        and s.get("environment", ENV) == ENV
+        and s.get("environment", env) == env
     ]
 
     if not sources:
@@ -94,10 +122,10 @@ def create_medallion_dag(subject: dict):
         dag_id=dag_id,
         schedule_interval=cron,
         start_date=datetime(2026, 1, 1),
-        default_args=DEFAULT_ARGS,
+        default_args=default_args,
         catchup=False,
         sla_miss_callback=on_sla_miss_teams_alert,
-        tags=["medallion", "fabric", ENV, subject_name],
+        tags=["medallion", "fabric", env, subject_name],
         doc_md=f"""
             ## Medallion Pipeline — {subject_name}
 
@@ -121,15 +149,15 @@ def create_medallion_dag(subject: dict):
             # Bronze: copy raw file into Bronze Lakehouse / Files/
             bronze = FabricRunItemOperator(
                 task_id=f"src_to_brz__{src['source_name']}",
-                fabric_conn_id=FABRIC_CONN_ID,
-                workspace_id=WORKSPACE_ID,
+                fabric_conn_id=fabric_conn_id,
+                workspace_id=workspace_id,
                 item_id=notebook_id("bronze_ingest_file"),
                 job_type="RunNotebook",
                 job_params={
                     "configuration": {
                         "parameters": {
                             "source_config": json.dumps(src),
-                            "env": ENV,
+                            "env": env,
                         }
                     }
                 },
@@ -139,15 +167,15 @@ def create_medallion_dag(subject: dict):
             # Silver 1: validate + clean + MERGE into staging_{source_name}
             silver1 = FabricRunItemOperator(
                 task_id=f"brz_to_sil1__{src['source_name']}",
-                fabric_conn_id=FABRIC_CONN_ID,
-                workspace_id=WORKSPACE_ID,
+                fabric_conn_id=fabric_conn_id,
+                workspace_id=workspace_id,
                 item_id=notebook_id("silver1_clean"),
                 job_type="RunNotebook",
                 job_params={
                     "configuration": {
                         "parameters": {
                             "source_config": json.dumps(src),
-                            "env": ENV,
+                            "env": env,
                         }
                     }
                 },
@@ -168,8 +196,8 @@ def create_medallion_dag(subject: dict):
         for entity, source_names in silver2_entities.items():
             silver2 = FabricRunItemOperator(
                 task_id=f"sil1_to_sil2__{entity}",
-                fabric_conn_id=FABRIC_CONN_ID,
-                workspace_id=WORKSPACE_ID,
+                fabric_conn_id=fabric_conn_id,
+                workspace_id=workspace_id,
                 item_id=notebook_id("silver2_combine"),
                 job_type="RunNotebook",
                 job_params={
@@ -177,7 +205,7 @@ def create_medallion_dag(subject: dict):
                         "parameters": {
                             "entity": entity,
                             "source_names": json.dumps(source_names),
-                            "env": ENV,
+                            "env": env,
                         }
                     }
                 },
@@ -214,9 +242,9 @@ def create_gold_dag(gold_cfg: dict):
         dag_id=gold_dag_id,
         schedule_interval=dataset_schedule,
         start_date=datetime(2026, 1, 1),
-        default_args=DEFAULT_ARGS,
+        default_args=default_args,
         catchup=False,
-        tags=["gold", "dbt", ENV],
+        tags=["gold", "dbt", env],
         doc_md=f"""
             ## Gold DAG — {dbt_model}
 
@@ -237,9 +265,9 @@ def create_gold_dag(gold_cfg: dict):
             ),
             env={
                 "DBT_PROJECT_DIR": Variable.get("dbt_project_dir", default_var="/opt/airflow/dags/dbt"),
-                "DBT_TARGET": ENV,
-                "DBT_WAREHOUSE_SERVER": Variable.get("dbt_warehouse_server", default_var=""),
-                "DBT_LAKEHOUSE":        Variable.get("lakehouse", default_var="fabric_lakehouse"),
+                "DBT_TARGET": env,
+                "DBT_WAREHOUSE_SERVER": env_config["gold_warehouse_sql_endpoint"],
+                "DBT_LAKEHOUSE":        env_config["lakehouse"],
                 "AZURE_TENANT_ID":      Variable.get("azure_tenant_id",     default_var=os.getenv("AZURE_TENANT_ID", "")),
                 "AZURE_CLIENT_ID":      Variable.get("azure_client_id",     default_var=os.getenv("AZURE_CLIENT_ID", "")),
                 "AZURE_CLIENT_SECRET":  Variable.get("azure_client_secret", default_var=os.getenv("AZURE_CLIENT_SECRET", "")),
@@ -253,13 +281,13 @@ def create_gold_dag(gold_cfg: dict):
 
 
 # ── Generate one DAG per subject ──────────────────────────────────────
-for _subject in _subjects:
-    _dag_obj = create_medallion_dag(_subject)
-    if _dag_obj is not None:
-        globals()[_subject["dag_id"]] = _dag_obj
+for subject in subjects:
+    dag_obj = create_medallion_dag(subject)
+    if dag_obj is not None:
+        globals()[subject["dag_id"]] = dag_obj
 
 # ── Generate one Gold DAG per gold_tables entry ───────────────────────
-for _gold_cfg in _gold_tables:
-    _gold_dag_obj = create_gold_dag(_gold_cfg)
-    if _gold_dag_obj is not None:
-        globals()[_gold_cfg["dag_id"]] = _gold_dag_obj
+for gold_cfg in gold_tables:
+    gold_dag_obj = create_gold_dag(gold_cfg)
+    if gold_dag_obj is not None:
+        globals()[gold_cfg["dag_id"]] = gold_dag_obj

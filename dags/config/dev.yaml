@@ -1,5 +1,7 @@
 environment: dev
 workspace_name: dev-fabric-data
+fabric_workspace_id: 8dac972c-0ff1-400f-bba3-e1e2302070b5
+fabric_conn_id: fabric_default
 lakehouse: fabric_lakehouse
 gold_warehouse: fabric_gold_warehouse
 key_vault_name: dev-fabric-kv
