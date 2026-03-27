@@ -11,7 +11,7 @@ subjects:
         bronze_path: bronze/fedex/invoice/
         bronze_file_pattern: "*.csv"
         silver1_table: staging_fedex_direct_invoice
-        silver2_table: carrier_invoice
+        silver2_table: silver_carrier_invoice
         extra_params:
           date_format: "%m/%d/%Y"
         is_enabled: true
@@ -23,7 +23,7 @@ subjects:
         bronze_path: bronze/dhl/invoice/
         bronze_file_pattern: "*.csv"
         silver1_table: staging_dhl_direct_invoice
-        silver2_table: carrier_invoice
+        silver2_table: silver_carrier_invoice
         extra_params:
           date_format: "%d/%m/%Y"
         is_enabled: true
@@ -35,7 +35,7 @@ subjects:
         bronze_path: bronze/ups/carrier/
         bronze_file_pattern: "*.xlsx"
         silver1_table: staging_ups_carrier_report
-        silver2_table: carrier_invoice
+        silver2_table: silver_carrier_invoice
         extra_params:
           sheet: Invoice
           date_format: "%Y-%m-%d"
@@ -53,7 +53,7 @@ subjects:
         bronze_path: bronze/usps/tracking/
         bronze_file_pattern: "*.parquet"
         silver1_table: staging_usps_tracking
-        silver2_table: carrier_tracking
+        silver2_table: silver_carrier_tracking
         is_enabled: true
         environment: dev
 
@@ -68,7 +68,7 @@ subjects:
         bronze_path: bronze/fedex/rate_card/
         bronze_file_pattern: "*.xlsx"
         silver1_table: staging_fedex_rate_card
-        silver2_table: carrier_rate_card
+        silver2_table: silver_carrier_rate_card
         extra_params:
           sheet: Rates
           date_format: "%Y-%m-%d"
@@ -81,13 +81,13 @@ gold_tables:
     dbt_model: fact_invoice
     wait_for:
       - dag_id: medallion_carrier_invoice
-        silver2_table: carrier_invoice
+        silver2_table: silver_carrier_invoice
 
   - dag_id: gold_dim_carrier
     dbt_model: dim_carrier
     wait_for:
       - dag_id: medallion_rate_card
-        silver2_table: carrier_rate_card
+        silver2_table: silver_carrier_rate_card
 
       - dag_id: medallion_carrier_tracking
-        silver2_table: carrier_tracking
+        silver2_table: silver_carrier_tracking

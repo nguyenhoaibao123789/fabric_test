@@ -1,6 +1,6 @@
 -- =============================================================
 -- Fabric Data Warehouse — DDL
--- Run once via deploy.py or manually in the Fabric SQL editor
+-- Run once manually in the Fabric SQL editor
 -- =============================================================
 
 -- ── Schemas ────────────────────────────────────────────────
@@ -28,7 +28,8 @@ CREATE INDEX ix_run_log_source_layer ON data_ops.pipeline_run_log (source_name, 
 CREATE INDEX ix_run_log_logged_at    ON data_ops.pipeline_run_log (logged_at);
 
 -- =============================================================
--- GOLD DIM TABLES
+-- GOLD TABLES — dim_carrier
+-- Fed by: medallion_rate_card → silver_carrier_rate_card
 -- =============================================================
 
 CREATE TABLE IF NOT EXISTS gold.dim_carrier (
@@ -41,56 +42,3 @@ CREATE TABLE IF NOT EXISTS gold.dim_carrier (
 );
 
 CREATE UNIQUE INDEX uix_dim_carrier_code ON gold.dim_carrier (carrier_code);
-
-CREATE TABLE IF NOT EXISTS gold.dim_date (
-    date_key        INT             PRIMARY KEY,   -- YYYYMMDD
-    full_date       DATE            NOT NULL,
-    year            SMALLINT        NOT NULL,
-    quarter         TINYINT         NOT NULL,
-    month           TINYINT         NOT NULL,
-    month_name      VARCHAR(20)     NOT NULL,
-    week_of_year    TINYINT         NOT NULL,
-    day_of_month    TINYINT         NOT NULL,
-    day_of_week     TINYINT         NOT NULL,
-    day_name        VARCHAR(20)     NOT NULL,
-    is_weekend      BIT             NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS gold.dim_service_type (
-    service_key     INT             IDENTITY(1,1) PRIMARY KEY,
-    carrier_code    VARCHAR(50)     NOT NULL,
-    service_code    VARCHAR(200)    NOT NULL,
-    service_name    VARCHAR(500)    NULL,
-    created_at      DATETIME2       NOT NULL DEFAULT GETUTCDATE()
-);
-
-CREATE UNIQUE INDEX uix_dim_service ON gold.dim_service_type (carrier_code, service_code);
-
--- =============================================================
--- GOLD FACT TABLE
--- =============================================================
-
-CREATE TABLE IF NOT EXISTS gold.fact_invoice (
-    invoice_key         BIGINT          IDENTITY(1,1) PRIMARY KEY,
-    invoice_number      VARCHAR(100)    NOT NULL,
-    invoice_date_key    INT             NULL REFERENCES gold.dim_date(date_key),
-    shipment_date_key   INT             NULL REFERENCES gold.dim_date(date_key),
-    carrier_key         INT             NULL REFERENCES gold.dim_carrier(carrier_key),
-    service_key         INT             NULL REFERENCES gold.dim_service_type(service_key),
-    tracking_number     VARCHAR(100)    NULL,
-    purchase_contract   VARCHAR(200)    NULL,
-    origin_country      VARCHAR(10)     NULL,
-    destination_country VARCHAR(10)     NULL,
-    weight_kg           FLOAT           NULL,
-    charge_amount       DECIMAL(18,4)   NULL,
-    charge_currency     VARCHAR(10)     NULL,
-    account_number      VARCHAR(100)    NULL,
-    _source_name        VARCHAR(200)    NULL,
-    _source_file        VARCHAR(500)    NULL,
-    _run_id             VARCHAR(500)    NULL,
-    loaded_at           DATETIME2       NOT NULL DEFAULT GETUTCDATE()
-);
-
-CREATE INDEX ix_fact_invoice_carrier  ON gold.fact_invoice (carrier_key);
-CREATE INDEX ix_fact_invoice_inv_date ON gold.fact_invoice (invoice_date_key);
-CREATE INDEX ix_fact_invoice_contract ON gold.fact_invoice (purchase_contract);

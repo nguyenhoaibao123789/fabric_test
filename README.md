@@ -284,9 +284,9 @@ fabric_lakehouse/
         ├── staging_ups_carrier_report/
         ├── staging_usps_tracking/
         ├── staging_fedex_rate_card/
-        ├── carrier_invoice/
-        ├── carrier_tracking/
-        └── carrier_rate_card/
+        ├── silver_carrier_invoice/
+        ├── silver_carrier_tracking/
+        └── silver_carrier_rate_card/
 ```
 
 ---
