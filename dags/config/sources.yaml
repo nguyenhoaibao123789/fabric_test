@@ -5,110 +5,87 @@ subjects:
     cron: "0 6 * * *"
     description: Daily morning carrier invoice ingestion
     sources:
-      - source_name: account
+      - source_name: fedex_direct_invoice
         carrier: fedex
-        data_classification: invoice
-        source_system: file
-        source_database: file_ingest
-        landing_path: landing/carrier/invoice/file/file_ingest/account/
-        bronze_path: bronze/carrier/invoice/file/file_ingest/account/
-        file_format: csv
-        silver1_table: staging_account
-        silver2_table: silver_carrier_invoice
+        landing_path: landing/fedex/invoice/
+        bronze_path: bronze/fedex/invoice/
+        bronze_file_pattern: "*.csv"
+        silver1_table: staging_fedex_direct_invoice
+        silver2_table: carrier_invoice
+        gold_table: fact_invoice
         extra_params:
           amount_cols: [charge_amount, fuel_surcharge, tax_amount]
           date_cols: [invoice_date, ship_date]
           date_format: "%m/%d/%Y"
+        is_enabled: true
         environment: dev
 
-      - source_name: billing
+      - source_name: dhl_direct_invoice
         carrier: dhl
-        data_classification: invoice
-        source_system: file
-        source_database: file_ingest
-        landing_path: landing/carrier/invoice/file/file_ingest/billing/
-        bronze_path: bronze/carrier/invoice/file/file_ingest/billing/
-        file_format: csv
-        silver1_table: staging_billing
-        silver2_table: silver_carrier_invoice
+        landing_path: landing/dhl/invoice/
+        bronze_path: bronze/dhl/invoice/
+        bronze_file_pattern: "*.csv"
+        silver1_table: staging_dhl_direct_invoice
+        silver2_table: carrier_invoice
+        gold_table: fact_invoice
         extra_params:
           amount_cols: [charge_amount, vat_amount]
           date_cols: [invoice_date, pickup_date]
           date_format: "%d/%m/%Y"
+        is_enabled: true
         environment: dev
 
-      - source_name: freight_detail
+      - source_name: ups_carrier_report
         carrier: ups
-        data_classification: invoice
-        source_system: file
-        source_database: file_ingest
-        landing_path: landing/carrier/invoice/file/file_ingest/freight_detail/
-        bronze_path: bronze/carrier/invoice/file/file_ingest/freight_detail/
-        file_format: excel
-        silver1_table: staging_freight_detail
-        silver2_table: silver_carrier_invoice
+        landing_path: landing/ups/carrier/
+        bronze_path: bronze/ups/carrier/
+        bronze_file_pattern: "*.xlsx"
+        silver1_table: staging_ups_carrier_report
+        silver2_table: carrier_invoice
+        gold_table: fact_invoice
         extra_params:
           sheet: Invoice
           amount_cols: [billed_amount, adjusted_amount]
           date_cols: [invoice_date]
           date_format: "%Y-%m-%d"
+        is_enabled: true
         environment: dev
 
-  - subject: freight_audit
-    dag_id: medallion_freight_audit
-    cron: "0 8 * * *"
-    description: 3PL audit adjustments
-    sources:
-      - source_name: audit_adjustment
-        carrier: cass
-        data_classification: invoice
-        source_system: file
-        source_database: file_ingest
-        landing_path: landing/carrier/invoice/file/file_ingest/audit_adjustment/
-        bronze_path: bronze/carrier/invoice/file/file_ingest/audit_adjustment/
-        file_format: csv
-        silver1_table: staging_audit_adjustment
-        silver2_table: silver_carrier_invoice
-        extra_params:
-          amount_cols: [adjusted_amount, original_amount, variance]
-          date_cols: [audit_date, invoice_date]
-          date_format: "%Y-%m-%d"
-        environment: dev
+  # - subject: carrier_tracking
+  #   dag_id: medallion_carrier_tracking
+  #   cron: "0 * * * *"
+  #   description: Hourly near-real-time tracking feeds
+  #   sources:
+  #     - source_name: usps_tracking
+  #       carrier: usps
+  #       landing_path: landing/usps/tracking/
+  #       bronze_path: bronze/usps/tracking/
+  #       bronze_file_pattern: "*.parquet"
+  #       silver1_table: staging_usps_tracking
+  #       silver2_table: carrier_tracking
+  #       gold_table: null
+  #       extra_params:
+  #         date_cols: [scan_date, delivery_date]
+  #       is_enabled: true
+  #       environment: dev
 
   - subject: rate_card
     dag_id: medallion_rate_card
     cron: "0 6 * * 0"
     description: Weekly Sunday rate card refresh
     sources:
-      - source_name: tariff
+      - source_name: fedex_rate_card
         carrier: fedex
-        data_classification: rate_card
-        source_system: file
-        source_database: file_ingest
-        landing_path: landing/carrier/rate_card/file/file_ingest/tariff/
-        bronze_path: bronze/carrier/rate_card/file/file_ingest/tariff/
-        file_format: excel
-        silver1_table: staging_tariff
-        silver2_table: silver_carrier_rate_card
+        landing_path: landing/fedex/rate_card/
+        bronze_path: bronze/fedex/rate_card/
+        bronze_file_pattern: "*.xlsx"
+        silver1_table: staging_fedex_rate_card
+        silver2_table: carrier_rate_card
+        gold_table: null
         extra_params:
           sheet: Rates
           amount_cols: [base_rate, fuel_surcharge_pct]
           date_cols: [effective_date, expiry_date]
           date_format: "%Y-%m-%d"
+        is_enabled: true
         environment: dev
-
-gold_tables:
-
-  - dag_id: gold_fact_freight_charge
-    dbt_model: fact_freight_charge
-    wait_for:
-      - dag_id: medallion_carrier_invoice
-        silver2_table: silver_carrier_invoice
-      - dag_id: medallion_freight_audit
-        silver2_table: silver_carrier_invoice
-
-  - dag_id: gold_dim_rate_tariff
-    dbt_model: dim_rate_tariff
-    wait_for:
-      - dag_id: medallion_rate_card
-        silver2_table: silver_carrier_rate_card

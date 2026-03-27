@@ -20,10 +20,10 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from airflow.datasets import Dataset
-from airflow.decorators import dag
+from airflow.decorators import dag, task
 from airflow.models import Variable
 from airflow.operators.bash import BashOperator
+from airflow.operators.empty import EmptyOperator
 
 # Fabric custom operators — installed in the Managed Airflow environment
 # pip install apache-airflow-microsoft-fabric-plugin
@@ -41,9 +41,7 @@ _CONFIG = _HERE / "config"  # dags/config/ — synced with git
 ENV = Variable.get("environment", default_var="dev")
 
 _env_config: dict = yaml.safe_load((_CONFIG / f"{ENV}.yaml").read_text())
-_sources_cfg: dict  = yaml.safe_load((_CONFIG / "sources.yaml").read_text())
-_subjects:    list[dict] = _sources_cfg["subjects"]
-_gold_tables: list[dict] = _sources_cfg.get("gold_tables", [])
+_subjects: list[dict] = yaml.safe_load((_CONFIG / "sources.yaml").read_text())["subjects"]
 
 WORKSPACE_ID  = Variable.get("fabric_workspace_id", default_var="")   # set in Airflow Variables
 FABRIC_CONN_ID = Variable.get("fabric_conn_id", default_var="fabric_default")
@@ -77,7 +75,8 @@ def create_medallion_dag(subject: dict):
 
     sources = [
         s for s in subject["sources"]
-        if s.get("environment", ENV) == ENV
+        if s.get("is_enabled", True)
+        and s.get("environment", ENV) == ENV
     ]
 
     if not sources:
@@ -106,7 +105,7 @@ def create_medallion_dag(subject: dict):
 
             Each source runs Bronze → Silver 1 independently in parallel.
             Silver 2 per entity runs after all its Silver 1 sources succeed (all_success).
-            Silver 2 emits a Dataset event consumed by the standalone Gold DAG.
+            Gold runs once after its upstream Silver 2 tasks succeed — does not wait for unrelated Silver 2 tasks.
                 """,
     )
     def dag_fn():
@@ -150,7 +149,6 @@ def create_medallion_dag(subject: dict):
                         }
                     }
                 },
-                outlets=[Dataset(f"silver1://{src['silver1_table']}")],
                 deferrable=True,
             )
 
@@ -181,76 +179,66 @@ def create_medallion_dag(subject: dict):
                         }
                     }
                 },
-                outlets=[Dataset(f"{dag_id}/silver2://{entity}")],
                 deferrable=True,
             )
 
             silver2.ui_color  = "#eae8fd"; silver2.ui_fgcolor = "#302880"
 
             # Wire: all silver1 tasks for this entity → silver2
-            # Silver2 emits a Dataset event consumed by the standalone Gold DAG
             upstream_tasks = [silver1_task_by_source[sn] for sn in source_names]
             upstream_tasks >> silver2
             silver2_task_by_entity[entity] = silver2
 
-    return dag_fn()
+        # ── Phase 4: Gold — dbt run ────────────────────────────────────
+        # Gold depends only on Silver 2 entities where gold_table is set in sources.json.
+        # This means Gold triggers as soon as its required entities succeed —
+        # it does NOT wait for unrelated Silver 2 entities in the same DAG.
+        gold_tables = {
+            s["silver2_table"]
+            for s in sources
+            if s.get("gold_table")
+        }
+        gold_upstream = [
+            silver2_task_by_entity[e]
+            for e in gold_tables
+            if e in silver2_task_by_entity
+        ]
 
+        if not gold_upstream:
+            log.warning(
+                "No gold_table sources found for subject '%s' — "
+                "Gold task will not be added to this DAG.",
+                subject_name,
+            )
+            return
 
-# ── Gold DAG factory ──────────────────────────────────────────────────
-def create_gold_dag(gold_cfg: dict):
-    """
-    Build a dataset-triggered Gold DAG for a single dbt model.
-    Fires only when ALL upstream Silver 2 datasets have emitted a new event.
-    """
-    gold_dag_id = gold_cfg["dag_id"]
-    dbt_model   = gold_cfg["dbt_model"]
-    wait_for    = gold_cfg["wait_for"]
-
-    dataset_schedule = [
-        Dataset(f"{w['dag_id']}/silver2://{w['silver2_table']}")
-        for w in wait_for
-    ]
-
-    @dag(
-        dag_id=gold_dag_id,
-        schedule=dataset_schedule,
-        start_date=datetime(2026, 1, 1),
-        default_args=DEFAULT_ARGS,
-        catchup=False,
-        tags=["gold", "dbt", ENV],
-        doc_md=f"""
-            ## Gold DAG — {dbt_model}
-
-            Triggered by datasets: {[w['silver2_table'] for w in wait_for]}
-            Runs only when ALL upstream Silver 2 tables have new data.
-            Executes: `dbt run --select {dbt_model}`
-                """,
-    )
-    def gold_dag_fn():
         gold = BashOperator(
-            task_id=f"dbt_run__{dbt_model}",
+            task_id="silver2_to_gold",
             bash_command=(
                 "set -e && "
                 "cd \"${DBT_PROJECT_DIR}\" && "
                 "dbt deps --profiles-dir . --quiet && "
-                f"dbt run  --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model} && "
-                f"dbt test --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}"
+                "dbt run  --profiles-dir . --target \"${DBT_TARGET}\" && "
+                "dbt test --profiles-dir . --target \"${DBT_TARGET}\""
             ),
             env={
                 "DBT_PROJECT_DIR": Variable.get("dbt_project_dir", default_var="/opt/airflow/dags/dbt"),
                 "DBT_TARGET": ENV,
-                "DBT_WAREHOUSE_SERVER": Variable.get("dbt_warehouse_server", default_var=""),
-                "DBT_LAKEHOUSE":        Variable.get("lakehouse", default_var="fabric_lakehouse"),
-                "AZURE_TENANT_ID":      Variable.get("azure_tenant_id",     default_var=os.getenv("AZURE_TENANT_ID", "")),
-                "AZURE_CLIENT_ID":      Variable.get("azure_client_id",     default_var=os.getenv("AZURE_CLIENT_ID", "")),
-                "AZURE_CLIENT_SECRET":  Variable.get("azure_client_secret", default_var=os.getenv("AZURE_CLIENT_SECRET", "")),
+                "DBT_WAREHOUSE_SERVER":  Variable.get("dbt_warehouse_server", default_var=""),
+                "DBT_LAKEHOUSE":         Variable.get("lakehouse", default_var="fabric_lakehouse"),
+                "AZURE_TENANT_ID":       Variable.get("azure_tenant_id",    default_var=os.getenv("AZURE_TENANT_ID", "")),
+                "AZURE_CLIENT_ID":       Variable.get("azure_client_id",    default_var=os.getenv("AZURE_CLIENT_ID", "")),
+                "AZURE_CLIENT_SECRET":   Variable.get("azure_client_secret",default_var=os.getenv("AZURE_CLIENT_SECRET", "")),
             },
             append_env=True,
             on_failure_callback=on_failure_teams_alert,
         )
+
         gold.ui_color  = "#fff8e0"; gold.ui_fgcolor = "#7a5800"
 
-    return gold_dag_fn()
+        gold_upstream >> gold
+
+    return dag_fn()
 
 
 # ── Generate one DAG per subject ──────────────────────────────────────
@@ -259,9 +247,3 @@ for _subject in _subjects:
     _dag_obj = create_medallion_dag(_subject)
     if _dag_obj is not None:
         globals()[_subject["dag_id"]] = _dag_obj
-
-# ── Generate one Gold DAG per gold_tables entry ───────────────────────
-for _gold_cfg in _gold_tables:
-    _gold_dag_obj = create_gold_dag(_gold_cfg)
-    if _gold_dag_obj is not None:
-        globals()[_gold_cfg["dag_id"]] = _gold_dag_obj
