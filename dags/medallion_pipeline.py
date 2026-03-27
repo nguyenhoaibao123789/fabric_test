@@ -213,7 +213,7 @@ def create_gold_dag(gold_cfg: dict):
 
     @dag(
         dag_id=gold_dag_id,
-        schedule=dataset_schedule,
+        schedule_interval=dataset_schedule,
         start_date=datetime(2026, 1, 1),
         default_args=DEFAULT_ARGS,
         catchup=False,
