@@ -28,8 +28,6 @@ resource "fabric_environment" "spark_env" {
 }
 
 # ── Notebooks ──────────────────────────────────────────────────────────────────
-# Note: PyPI library installation is managed by deploy.py via the Fabric REST API,
-# not via Terraform (the microsoft/fabric provider v1.x has no resource for it).
 
 resource "fabric_notebook" "notebooks" {
   for_each = local.notebooks
@@ -38,8 +36,6 @@ resource "fabric_notebook" "notebooks" {
   display_name = each.key
   format       = "ipynb"
 
-  # Upload the notebook file. Environment attachment (environmentId in metadata)
-  # is handled post-deploy by deploy.py, which patches the notebook via REST API.
   definition = {
     "notebook-content.ipynb" = {
       source          = each.value.ipynb_path
@@ -49,4 +45,3 @@ resource "fabric_notebook" "notebooks" {
 
   depends_on = [fabric_environment.spark_env]
 }
-
