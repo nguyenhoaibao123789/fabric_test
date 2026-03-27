@@ -1,13 +1,10 @@
 # profiles.yml — dbt-fabric connection profiles
 # ===============================================
-# Authentication uses a service principal.
-# Set these environment variables before running dbt:
-#   AZURE_TENANT_ID       — Azure AD tenant ID
-#   AZURE_CLIENT_ID       — service principal app ID
-#   AZURE_CLIENT_SECRET   — service principal secret
-#   DBT_WAREHOUSE_SERVER  — e.g. <workspace-id>.datawarehouse.fabric.microsoft.com
+# Authentication uses managed identity (MSI).
+# The Fabric Airflow job's workspace identity is used automatically —
+# no credentials need to be set.
 #
-# IMPORTANT: Never commit real credentials to this file.
+# Requires: DBT_WAREHOUSE_SERVER env var (set by medallion_pipeline.py from env_config)
 
 fabric_medallion:
   target: dev
@@ -19,10 +16,7 @@ fabric_medallion:
       port: 1433
       database: gold_warehouse
       schema: gold
-      authentication: serviceprincipal
-      tenant_id: "{{ env_var('AZURE_TENANT_ID') }}"
-      client_id: "{{ env_var('AZURE_CLIENT_ID') }}"
-      client_secret: "{{ env_var('AZURE_CLIENT_SECRET') }}"
+      authentication: msi
       encrypt: true
       trust_cert: false
       connect_timeout: 30
@@ -34,10 +28,7 @@ fabric_medallion:
       port: 1433
       database: gold_warehouse
       schema: gold
-      authentication: serviceprincipal
-      tenant_id: "{{ env_var('AZURE_TENANT_ID') }}"
-      client_id: "{{ env_var('AZURE_CLIENT_ID') }}"
-      client_secret: "{{ env_var('AZURE_CLIENT_SECRET') }}"
+      authentication: msi
       encrypt: true
       trust_cert: false
       connect_timeout: 30

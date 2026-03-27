@@ -13,11 +13,9 @@ DAGs produced (example):
 Adding a new subject/schedule: add a subject block to sources.yaml, no code change needed.
 Adding a new source:           add a source entry under the relevant subject, no code change needed.
 """
-import functools
 import json
 import yaml
 import logging
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -29,8 +27,6 @@ from airflow.operators.bash import BashOperator
 # Fabric custom operators — installed in the Managed Airflow environment
 # pip install apache-airflow-microsoft-fabric-plugin
 from apache_airflow_microsoft_fabric_plugin.operators.fabric import FabricRunItemOperator
-from apache_airflow_microsoft_fabric_plugin.hooks.fabric import FabricHook
-
 from callbacks import on_failure_teams_alert, on_sla_miss_teams_alert
 
 log = logging.getLogger(__name__)
@@ -61,36 +57,10 @@ default_args = {
 }
 
 
-# ── Notebook item IDs — resolved at parse time via Fabric REST API ────
-@functools.lru_cache(maxsize=1)
-def notebook_map() -> dict[str, str]:
-    """
-    Fetch all Notebook items from the workspace once per module import.
-    Returns {displayName: itemId}.
-    Uses the existing Fabric connection (fabric_conn_id) — no extra credentials needed.
-    """
-    if not workspace_id:
-        log.warning("fabric_workspace_id is empty in env config — notebook IDs will be empty")
-        return {}
-
-    hook    = FabricHook(fabric_conn_id=fabric_conn_id)
-    session = hook.get_conn()   # requests.Session with Bearer token already set
-
-    url  = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/items"
-    resp = session.get(url, params={"type": "Notebook"}, timeout=30)
-    resp.raise_for_status()
-
-    mapping = {item["displayName"]: item["id"] for item in resp.json().get("value", [])}
-    log.info("Resolved %d notebooks from Fabric workspace", len(mapping))
-    return mapping
-
-
+# ── Notebook item IDs ─────────────────────────────────────────────────
 def notebook_id(name: str) -> str:
-    """Return the Fabric item ID for a notebook by its display name."""
-    item_id = notebook_map().get(name, "")
-    if not item_id:
-        log.warning("Notebook '%s' not found in workspace — task will fail at runtime", name)
-    return item_id
+    """Look up Fabric notebook item ID from an Airflow Variable."""
+    return Variable.get(name, default_var="")
 
 
 # ── DAG factory ───────────────────────────────────────────────────────
@@ -264,13 +234,10 @@ def create_gold_dag(gold_cfg: dict):
                 f"dbt test --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}"
             ),
             env={
-                "DBT_PROJECT_DIR": Variable.get("dbt_project_dir", default_var="/opt/airflow/dags/dbt"),
-                "DBT_TARGET": env,
+                "DBT_PROJECT_DIR":      Variable.get("dbt_project_dir", default_var="/opt/airflow/dags/dbt"),
+                "DBT_TARGET":           env,
                 "DBT_WAREHOUSE_SERVER": env_config["gold_warehouse_sql_endpoint"],
                 "DBT_LAKEHOUSE":        env_config["lakehouse"],
-                "AZURE_TENANT_ID":      Variable.get("azure_tenant_id",     default_var=os.getenv("AZURE_TENANT_ID", "")),
-                "AZURE_CLIENT_ID":      Variable.get("azure_client_id",     default_var=os.getenv("AZURE_CLIENT_ID", "")),
-                "AZURE_CLIENT_SECRET":  Variable.get("azure_client_secret", default_var=os.getenv("AZURE_CLIENT_SECRET", "")),
             },
             append_env=True,
             on_failure_callback=on_failure_teams_alert,
