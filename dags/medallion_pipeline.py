@@ -234,7 +234,7 @@ def create_gold_dag(gold_cfg: dict):
                 f"dbt test --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}"
             ),
             env={
-                "DBT_PROJECT_DIR":      Variable.get("dbt_project_dir", default_var="/opt/airflow/dags/dbt"),
+                "DBT_PROJECT_DIR": "/opt/airflow/dags/dbt",
                 "DBT_TARGET":           env,
                 "DBT_WAREHOUSE_SERVER": env_config["gold_warehouse_sql_endpoint"],
                 "DBT_LAKEHOUSE":        env_config["lakehouse"],

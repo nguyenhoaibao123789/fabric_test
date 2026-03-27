@@ -13,8 +13,6 @@ subjects:
         silver1_table: staging_fedex_direct_invoice
         silver2_table: carrier_invoice
         extra_params:
-          amount_cols: [charge_amount, fuel_surcharge, tax_amount]
-          date_cols: [invoice_date, ship_date]
           date_format: "%m/%d/%Y"
         is_enabled: true
         environment: dev
@@ -27,8 +25,6 @@ subjects:
         silver1_table: staging_dhl_direct_invoice
         silver2_table: carrier_invoice
         extra_params:
-          amount_cols: [charge_amount, vat_amount]
-          date_cols: [invoice_date, pickup_date]
           date_format: "%d/%m/%Y"
         is_enabled: true
         environment: dev
@@ -42,8 +38,6 @@ subjects:
         silver2_table: carrier_invoice
         extra_params:
           sheet: Invoice
-          amount_cols: [billed_amount, adjusted_amount]
-          date_cols: [invoice_date]
           date_format: "%Y-%m-%d"
         is_enabled: true
         environment: dev
@@ -60,8 +54,6 @@ subjects:
         bronze_file_pattern: "*.parquet"
         silver1_table: staging_usps_tracking
         silver2_table: carrier_tracking
-        extra_params:
-          date_cols: [scan_date, delivery_date]
         is_enabled: true
         environment: dev
 
@@ -79,8 +71,6 @@ subjects:
         silver2_table: carrier_rate_card
         extra_params:
           sheet: Rates
-          amount_cols: [base_rate, fuel_surcharge_pct]
-          date_cols: [effective_date, expiry_date]
           date_format: "%Y-%m-%d"
         is_enabled: true
         environment: dev

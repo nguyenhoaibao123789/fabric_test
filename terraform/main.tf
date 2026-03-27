@@ -4,6 +4,9 @@ locals {
     "shared_functions" = {
       ipynb_path = "${path.module}/../notebooks/shared/shared_functions.ipynb"
     }
+    "setup_create_silver_tables" = {
+      ipynb_path = "${path.module}/../notebooks/setup/create_silver_tables.ipynb"
+    }
     "bronze_ingest_file" = {
       ipynb_path = "${path.module}/../notebooks/bronze/ingest_file.ipynb"
     }

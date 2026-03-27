@@ -7,6 +7,9 @@ __pycache__/
 config/resource_ids_*.json
 config/prod.json
 
+# Airflow Variables export (contains workspace-specific notebook IDs)
+airflow-variables.json
+
 # Terraform state
 terraform/.terraform/
 terraform/.terraform.lock.hcl

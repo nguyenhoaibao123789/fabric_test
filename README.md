@@ -91,6 +91,12 @@ gold_warehouse_sql_endpoint: "<workspace-id>.datawarehouse.fabric.microsoft.com"
 
 Open `fabric_gold_warehouse` → SQL editor, run `warehouse/create_tables.sql`.
 
+### Step 4b — Create Silver Lakehouse tables
+
+After `terraform apply`, open the `setup_create_silver_tables` notebook in Fabric and run it once.
+This creates all Silver 1 staging and Silver 2 Delta tables in the Lakehouse before any DAGs run.
+Safe to re-run — existing tables and data are never modified.
+
 > **Never run `dbt run --full-refresh` in production** — it drops and recreates tables, losing `IDENTITY` definitions.
 
 ### Step 5 — Set up local Python environment
@@ -170,22 +176,21 @@ In the Airflow UI (**Monitor Airflow** → **Admin → Connections → + Add**):
 |---|---|
 | Conn Id | `fabric_default` |
 | Conn Type | Microsoft Fabric |
-| Tenant ID | your Azure tenant ID |
-| Client ID | your Service Principal client ID |
-| Client Secret | your Service Principal secret |
 
-This connection is used both to run notebooks and to auto-discover notebook IDs at DAG parse time.
+Authentication uses the workspace managed identity — no Azure credentials required.
 
-### Step 12 — Set Airflow Variables
+### Step 12 — Import Airflow Variables
 
-In the Airflow UI → **Admin → Variables**, add:
+After `terraform apply`, generate the variables file:
 
-| Variable | Value |
-|---|---|
-| `environment` | `dev` (or `prod`) — optional, defaults to `dev` |
-| `dbt_project_dir` | `/opt/airflow/git/<repo-name>.git/dags/dbt` — optional, has default |
+```bash
+cd terraform
+terraform output -json airflow_variables > ../airflow-variables.json
+```
 
-> Notebook IDs and Azure credentials are both read from the `fabric_default` connection set up in Step 11 — no extra Variables needed for them.
+Then in the Airflow UI → **Admin → Variables → Import Variables**, upload `airflow-variables.json`.
+
+> `airflow-variables.json` is gitignored — it contains notebook IDs tied to your specific workspace.
 
 ---
 
