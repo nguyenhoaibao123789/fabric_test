@@ -165,6 +165,15 @@ section{min-height:100vh;padding:88px 64px 64px;display:flex;flex-direction:colu
 .layer-gold.state-pending{background:#fff8e0;border-color:#d4a820;color:#9a7020;}
 .layer-gold.state-upstream_failed{background:#fff8e0;border-color:#d4a820;border-style:dashed;color:#c0a060;}
 
+.layer-sensor{background:var(--teal-bg);border-color:var(--teal-str);color:var(--teal-tx);border-style:dashed;}
+.layer-sensor.state-running{background:var(--teal-bg);border-color:var(--teal-str);color:var(--teal-tx);border-style:dashed;animation:pulse-blue 1.2s infinite;}
+.layer-sensor.state-success{background:var(--green-bg);border-color:var(--green-str);color:var(--green-tx);border-style:solid;}
+.layer-sensor.state-pending{background:var(--teal-bg);border-color:var(--teal-str);color:var(--teal-tx);opacity:.55;border-style:dashed;}
+.layer-sensor.state-upstream_failed{background:var(--teal-bg);border-color:var(--teal-str);border-style:dashed;color:var(--teal-tx);opacity:.4;}
+
+/* ─── S6: CROSS-DAG ──────────────────── */
+#s6{background:var(--bg)}
+
 /* ─── Legend ─────────────────────────── */
 .dag-legend{display:flex;gap:16px;padding:12px 20px;border-top:1px solid var(--bd);flex-wrap:wrap;background:var(--bg);}
 .leg-item{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--tx2);}
@@ -243,6 +252,7 @@ section{min-height:100vh;padding:88px 64px 64px;display:flex;flex-direction:colu
     <a class="nl" href="#s3">Dependencies</a>
     <a class="nl" href="#s4">Error &amp; Rerun</a>
     <a class="nl" href="#s5">DAG Code</a>
+    <a class="nl" href="#s6">Cross-DAG</a>
   </div>
   <div id="nav-badge">Medallion Pipeline</div>
 </nav>
@@ -254,6 +264,7 @@ section{min-height:100vh;padding:88px 64px 64px;display:flex;flex-direction:colu
   <button class="dot" onclick="scrollTo(2)" title="Dependencies"></button>
   <button class="dot" onclick="scrollTo(3)" title="Error &amp; Rerun"></button>
   <button class="dot" onclick="scrollTo(4)" title="DAG Code"></button>
+  <button class="dot" onclick="scrollTo(5)" title="Cross-DAG"></button>
 </div>
 
 <!-- ═══════════════════════════════════════ -->
@@ -678,6 +689,179 @@ Metadata-driven: reads sources.json at parse time to generate task groups.
   <div class="s-num">05</div>
 </section>
 
+<!-- ═══════════════════════════════════════ -->
+<!-- S6: CROSS-DAG DEPENDENCIES             -->
+<!-- ═══════════════════════════════════════ -->
+<section id="s6">
+  <div class="s-eyebrow">Multi-DAG Orchestration</div>
+  <h2 class="s-title">Cross-DAG <em>Gold Dependencies</em></h2>
+  <p class="s-sub">Two DAGs run in parallel from the same cron.
+    <strong>medallion_freight_audit</strong>'s Gold task must wait for specific Silver 1
+    tasks in <strong>medallion_carrier_invoice</strong> via
+    <code style="font-family:var(--mono);background:var(--bg3);padding:2px 6px;border-radius:4px;">ExternalTaskSensor</code>
+    — declared in <code style="font-family:var(--mono);background:var(--bg3);padding:2px 6px;border-radius:4px;">sources.yaml</code>
+    under <code style="font-family:var(--mono);background:var(--bg3);padding:2px 6px;border-radius:4px;">gold_wait_for</code>.
+    The factory auto-generates the sensors at parse time — no code change needed, only config.</p>
+
+  <div class="dag-wrapper" style="max-width:1060px;">
+    <div class="dag-toolbar">
+      <span class="dag-toolbar-title">2 DAGs · cron: 0 6 * * * · parallel start</span>
+      <span style="font-size:10px;color:var(--tx3);font-weight:600;letter-spacing:.04em;">· ExternalTaskSensor (reschedule) at Gold</span>
+      <button class="btn btn-run" id="cd-btn-run" onclick="runCrossDAG()">▶ Run Both DAGs</button>
+      <button class="btn btn-reset" id="cd-btn-reset" onclick="resetCrossDAG()">↺ Reset</button>
+      <span class="dag-status-msg" id="cd-status">Ready — click ▶ to simulate</span>
+    </div>
+
+    <div class="dag-canvas" id="cd-canvas" style="height:420px;">
+      <svg id="cd-svg" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></svg>
+
+      <!-- Lane 1: carrier_invoice -->
+      <div style="position:absolute;left:8px;top:8px;right:8px;height:200px;background:rgba(250,235,212,.18);border:1.5px solid rgba(179,105,0,.18);border-radius:10px;pointer-events:none;"></div>
+      <div style="position:absolute;left:22px;top:14px;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--amber-tx);font-family:var(--mono);opacity:.85;pointer-events:none;">medallion_carrier_invoice · 0 6 * * *</div>
+
+      <!-- Lane 2: freight_audit -->
+      <div style="position:absolute;left:8px;top:216px;right:8px;height:196px;background:rgba(234,232,253,.18);border:1.5px solid rgba(114,104,212,.18);border-radius:10px;pointer-events:none;"></div>
+      <div style="position:absolute;left:22px;top:222px;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--purple-tx);font-family:var(--mono);opacity:.85;pointer-events:none;">medallion_freight_audit · 0 6 * * * · gold_wait_for: carrier_invoice Silver 1</div>
+
+      <!-- carrier_invoice nodes -->
+      <div class="t-node layer-bronze state-pending" id="cd-ci-brz-acct"
+           style="left:25px;top:48px;width:135px;height:48px;">
+        <div class="t-label">src_to_brz__account</div>
+        <div class="t-layer">Bronze</div>
+        <div class="t-state" id="cd-state-ci-brz-acct">pending</div>
+      </div>
+      <div class="t-node layer-bronze state-pending" id="cd-ci-brz-bill"
+           style="left:25px;top:112px;width:135px;height:48px;">
+        <div class="t-label">src_to_brz__billing</div>
+        <div class="t-layer">Bronze</div>
+        <div class="t-state" id="cd-state-ci-brz-bill">pending</div>
+      </div>
+      <div class="t-node layer-silver1 state-pending" id="cd-ci-sil1-acct"
+           style="left:192px;top:48px;width:148px;height:48px;">
+        <div class="t-label">brz_to_sil1__account</div>
+        <div class="t-layer">Silver 1</div>
+        <div class="t-state" id="cd-state-ci-sil1-acct">pending</div>
+      </div>
+      <div class="t-node layer-silver1 state-pending" id="cd-ci-sil1-bill"
+           style="left:192px;top:112px;width:148px;height:48px;">
+        <div class="t-label">brz_to_sil1__billing</div>
+        <div class="t-layer">Silver 1</div>
+        <div class="t-state" id="cd-state-ci-sil1-bill">pending</div>
+      </div>
+      <div class="t-node layer-silver2 state-pending" id="cd-ci-sil2"
+           style="left:380px;top:80px;width:168px;height:48px;">
+        <div class="t-label">sil1_to_sil2__silver_carrier_invoice</div>
+        <div class="t-layer">Silver 2</div>
+        <div class="t-state" id="cd-state-ci-sil2">pending</div>
+      </div>
+      <div class="t-node layer-gold state-pending" id="cd-ci-gold"
+           style="left:590px;top:80px;width:118px;height:48px;">
+        <div class="t-label">silver2_to_gold</div>
+        <div class="t-layer">Gold · dbt</div>
+        <div class="t-state" id="cd-state-ci-gold">pending</div>
+      </div>
+
+      <!-- freight_audit nodes -->
+      <div class="t-node layer-bronze state-pending" id="cd-fa-brz-audit"
+           style="left:25px;top:268px;width:152px;height:48px;">
+        <div class="t-label">src_to_brz__audit_adjustment</div>
+        <div class="t-layer">Bronze</div>
+        <div class="t-state" id="cd-state-fa-brz-audit">pending</div>
+      </div>
+      <div class="t-node layer-silver1 state-pending" id="cd-fa-sil1-audit"
+           style="left:212px;top:268px;width:155px;height:48px;">
+        <div class="t-label">brz_to_sil1__audit_adjustment</div>
+        <div class="t-layer">Silver 1</div>
+        <div class="t-state" id="cd-state-fa-sil1-audit">pending</div>
+      </div>
+      <div class="t-node layer-silver2 state-pending" id="cd-fa-sil2"
+           style="left:410px;top:268px;width:165px;height:48px;">
+        <div class="t-label">sil1_to_sil2__silver_carrier_invoice</div>
+        <div class="t-layer">Silver 2</div>
+        <div class="t-state" id="cd-state-fa-sil2">pending</div>
+      </div>
+      <div class="t-node layer-sensor state-pending" id="cd-fa-sensor-acct"
+           style="left:622px;top:250px;width:162px;height:44px;">
+        <div class="t-label">wait__ci__sil1__account</div>
+        <div class="t-layer">ExternalTaskSensor</div>
+        <div class="t-state" id="cd-state-fa-sensor-acct">pending</div>
+      </div>
+      <div class="t-node layer-sensor state-pending" id="cd-fa-sensor-bill"
+           style="left:622px;top:307px;width:162px;height:44px;">
+        <div class="t-label">wait__ci__sil1__billing</div>
+        <div class="t-layer">ExternalTaskSensor</div>
+        <div class="t-state" id="cd-state-fa-sensor-bill">pending</div>
+      </div>
+      <div class="t-node layer-gold state-pending" id="cd-fa-gold"
+           style="left:828px;top:268px;width:108px;height:48px;">
+        <div class="t-label">silver2_to_gold</div>
+        <div class="t-layer">Gold · dbt</div>
+        <div class="t-state" id="cd-state-fa-gold">pending</div>
+      </div>
+    </div>
+
+    <div class="dag-legend">
+      <div class="leg-item"><div class="leg-dot leg-pending"></div>pending</div>
+      <div class="leg-item"><div class="leg-dot leg-running"></div>running</div>
+      <div class="leg-item"><div class="leg-dot leg-success"></div>success</div>
+      <div class="leg-item">
+        <div class="leg-dot" style="background:var(--teal-bg);border-color:var(--teal-str);border-style:dashed;"></div>
+        ExternalTaskSensor
+      </div>
+      <div style="margin-left:auto;font-size:11px;color:var(--tx3);display:flex;align-items:center;gap:6px;">
+        <svg width="30" height="10" style="overflow:visible;flex-shrink:0;">
+          <line x1="0" y1="5" x2="28" y2="5" stroke="#18916a" stroke-width="2" stroke-dasharray="5,3"/>
+          <polygon points="24,2 30,5 24,8" fill="#18916a"/>
+        </svg>
+        cross-DAG watch
+      </div>
+    </div>
+  </div>
+
+  <!-- Config + Code cards -->
+  <div style="max-width:1060px;margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div class="dep-card">
+      <div class="dep-card-title"><span style="font-size:16px;">📋</span> sources.yaml — gold_wait_for</div>
+      <div class="dep-card-sub">Declare cross-DAG Gold dependencies in config. One sensor per entry, generated at parse time.</div>
+      <div class="code-block" style="font-size:11px;line-height:1.7;">
+<span class="c-comment">- subject: freight_audit</span>
+  <span class="c-var">dag_id</span><span class="c-op">:</span> <span class="c-string">medallion_freight_audit</span>
+  <span class="c-var">cron</span><span class="c-op">:</span> <span class="c-string">"0 6 * * *"</span>
+  <span class="c-var">gold_wait_for</span><span class="c-op">:</span>
+    <span class="c-op">-</span> <span class="c-var">dag_id</span><span class="c-op">:</span> <span class="c-string">medallion_carrier_invoice</span>
+      <span class="c-var">task_id</span><span class="c-op">:</span> <span class="c-string">brz_to_sil1__account</span>
+      <span class="c-var">execution_delta_minutes</span><span class="c-op">:</span> <span class="c-num">0</span>
+    <span class="c-op">-</span> <span class="c-var">dag_id</span><span class="c-op">:</span> <span class="c-string">medallion_carrier_invoice</span>
+      <span class="c-var">task_id</span><span class="c-op">:</span> <span class="c-string">brz_to_sil1__billing</span>
+      <span class="c-var">execution_delta_minutes</span><span class="c-op">:</span> <span class="c-num">0</span>
+      </div>
+    </div>
+    <div class="dep-card">
+      <div class="dep-card-title"><span style="font-size:16px;">⚙️</span> Auto-generated by the factory</div>
+      <div class="dep-card-sub">The DAG factory reads <code style="font-family:var(--mono);font-size:11px;">gold_wait_for</code> and wires sensors upstream of Gold — all inferred from config, no code change.</div>
+      <div class="code-block" style="font-size:11px;line-height:1.7;">
+<span class="c-keyword">if</span> gold_wait_for<span class="c-op">:</span>
+    sensors <span class="c-op">=</span> [
+        <span class="c-func">ExternalTaskSensor</span>(
+            task_id<span class="c-op">=</span><span class="c-string">f"wait__{w['dag_id']}__{w['task_id']}"</span>,
+            external_dag_id<span class="c-op">=</span>w[<span class="c-string">"dag_id"</span>],
+            external_task_id<span class="c-op">=</span>w[<span class="c-string">"task_id"</span>],
+            execution_delta<span class="c-op">=</span><span class="c-func">timedelta</span>(
+                minutes<span class="c-op">=</span>w.<span class="c-func">get</span>(<span class="c-string">"execution_delta_minutes"</span>, <span class="c-num">0</span>)),
+            mode<span class="c-op">=</span><span class="c-string">"reschedule"</span>,  <span class="c-comment"># non-blocking</span>
+        )
+        <span class="c-keyword">for</span> w <span class="c-keyword">in</span> gold_wait_for
+    ]
+    gold_upstream <span class="c-op">&gt;&gt;</span> sensors <span class="c-op">&gt;&gt;</span> gold
+<span class="c-keyword">else</span><span class="c-op">:</span>
+    gold_upstream <span class="c-op">&gt;&gt;</span> gold
+      </div>
+    </div>
+  </div>
+
+  <div class="s-num">06</div>
+</section>
+
 <!-- ─────────────────────────────────────── -->
 <!-- SCRIPTS                                 -->
 <!-- ─────────────────────────────────────── -->
@@ -970,9 +1154,187 @@ function resetDAG(reEnable = true){
   drawArrows();
 }
 
+/* ── Cross-DAG Section ─────────────────────────────────── */
+const CD_NODES = [
+  'ci-brz-acct','ci-brz-bill','ci-sil1-acct','ci-sil1-bill','ci-sil2','ci-gold',
+  'fa-brz-audit','fa-sil1-audit','fa-sil2','fa-sensor-acct','fa-sensor-bill','fa-gold'
+];
+const CD_LAYER = {
+  'ci-brz-acct':    'layer-bronze',
+  'ci-brz-bill':    'layer-bronze',
+  'ci-sil1-acct':   'layer-silver1',
+  'ci-sil1-bill':   'layer-silver1',
+  'ci-sil2':        'layer-silver2',
+  'ci-gold':        'layer-gold',
+  'fa-brz-audit':   'layer-bronze',
+  'fa-sil1-audit':  'layer-silver1',
+  'fa-sil2':        'layer-silver2',
+  'fa-sensor-acct': 'layer-sensor',
+  'fa-sensor-bill': 'layer-sensor',
+  'fa-gold':        'layer-gold',
+};
+// [fromId, toId, type: 'normal'|'cross']
+const CD_ARROWS = [
+  ['ci-brz-acct',    'ci-sil1-acct',   'normal'],
+  ['ci-brz-bill',    'ci-sil1-bill',   'normal'],
+  ['ci-sil1-acct',   'ci-sil2',        'normal'],
+  ['ci-sil1-bill',   'ci-sil2',        'normal'],
+  ['ci-sil2',        'ci-gold',        'normal'],
+  ['fa-brz-audit',   'fa-sil1-audit',  'normal'],
+  ['fa-sil1-audit',  'fa-sil2',        'normal'],
+  ['fa-sil2',        'fa-sensor-acct', 'normal'],
+  ['fa-sil2',        'fa-sensor-bill', 'normal'],
+  ['fa-sensor-acct', 'fa-gold',        'normal'],
+  ['fa-sensor-bill', 'fa-gold',        'normal'],
+  // Cross-DAG: ci Silver1 → fa sensors (dashed teal)
+  ['ci-sil1-acct',   'fa-sensor-acct', 'cross'],
+  ['ci-sil1-bill',   'fa-sensor-bill', 'cross'],
+];
+
+function setCDState(id, state){
+  const el  = document.getElementById('cd-' + id);
+  const lbl = document.getElementById('cd-state-' + id);
+  if(!el) return;
+  el.className = el.className.replace(/state-\S+/g,'').trim();
+  el.classList.add('state-' + state);
+  if(CD_LAYER[id]) el.classList.add(CD_LAYER[id]);
+  if(lbl) lbl.textContent = state;
+  drawCDArrows();
+}
+
+function getCDState(id){
+  const el = document.getElementById('cd-' + id);
+  if(!el) return 'pending';
+  const m = el.className.match(/state-(\S+)/);
+  return m ? m[1] : 'pending';
+}
+
+function cdNodePos(id){
+  const el = document.getElementById('cd-' + id);
+  if(!el) return {x:0,y:0,w:0,h:0};
+  return {x:el.offsetLeft, y:el.offsetTop, w:el.offsetWidth, h:el.offsetHeight};
+}
+
+function drawCDArrows(){
+  const svg = document.getElementById('cd-svg');
+  if(!svg) return;
+  svg.innerHTML = '';
+
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const mColors = {green:'#5c8f1e', blue:'#1565a8', red:'#c0392b', gray:'#c8c4bc', teal:'#18916a'};
+  for(const [name,col] of Object.entries(mColors)){
+    const mk = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    mk.setAttribute('id','cdarr-'+name);
+    mk.setAttribute('markerWidth','8'); mk.setAttribute('markerHeight','6');
+    mk.setAttribute('refX','7'); mk.setAttribute('refY','3');
+    mk.setAttribute('orient','auto');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    poly.setAttribute('points','0 0, 8 3, 0 6');
+    poly.setAttribute('fill', col);
+    mk.appendChild(poly); defs.appendChild(mk);
+  }
+  svg.appendChild(defs);
+
+  CD_ARROWS.forEach(([fromId, toId, type]) => {
+    const f = cdNodePos(fromId);
+    const t = cdNodePos(toId);
+    const fs = getCDState(fromId);
+    const ts = getCDState(toId);
+
+    let x1, y1, x2, y2, d, col, mname;
+
+    if(type === 'cross'){
+      // Right-center of ci node → left-center of fa sensor, curving down
+      x1 = f.x + f.w;  y1 = f.y + f.h / 2;
+      x2 = t.x;         y2 = t.y + t.h / 2;
+      const mx = (x1 + x2) / 2;
+      d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+      col = (fs==='success') ? '#18916a' : (fs==='failed') ? '#c0392b' : '#18916a';
+      mname = (fs==='failed') ? 'red' : 'teal';
+    } else {
+      x1 = f.x + f.w;  y1 = f.y + f.h / 2;
+      x2 = t.x;         y2 = t.y + t.h / 2;
+      const dx = (x2 - x1) * 0.45;
+      d = `M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`;
+      if(fs==='success' && (ts==='running'||ts==='success')){ col='#5c8f1e'; mname='green'; }
+      else if(fs==='failed'||ts==='failed'){                   col='#c0392b'; mname='red'; }
+      else if(fs==='running'){                                  col='#1565a8'; mname='blue'; }
+      else {                                                    col='#c8c4bc'; mname='gray'; }
+    }
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', col);
+    path.setAttribute('stroke-width', type==='cross' ? '2' : (fs==='running' ? '2.5' : '2'));
+    if(type==='cross') path.setAttribute('stroke-dasharray','7,4');
+    path.setAttribute('marker-end', `url(#cdarr-${mname})`);
+    path.setAttribute('opacity', type==='cross' ? '0.65' : '0.85');
+    svg.appendChild(path);
+  });
+}
+
+const CD_HAPPY = [
+  {t:'ci-brz-acct',    s:'running', ms:0},
+  {t:'ci-brz-bill',    s:'running', ms:0},
+  {t:'fa-brz-audit',   s:'running', ms:0},
+  {t:'ci-brz-acct',    s:'success', ms:1100},
+  {t:'ci-sil1-acct',   s:'running', ms:1200},
+  {t:'ci-brz-bill',    s:'success', ms:1300},
+  {t:'ci-sil1-bill',   s:'running', ms:1400},
+  {t:'fa-brz-audit',   s:'success', ms:1400},
+  {t:'fa-sil1-audit',  s:'running', ms:1500},
+  {t:'ci-sil1-acct',   s:'success', ms:2400},
+  {t:'ci-sil1-bill',   s:'success', ms:2600},
+  {t:'fa-sil1-audit',  s:'success', ms:2600},
+  {t:'ci-sil2',        s:'running', ms:2800},
+  {t:'fa-sil2',        s:'running', ms:2800},
+  // sensors start polling carrier_invoice (mode=reschedule, non-blocking)
+  {t:'fa-sensor-acct', s:'running', ms:3000},
+  {t:'fa-sensor-bill', s:'running', ms:3000},
+  {t:'ci-sil2',        s:'success', ms:3900},
+  {t:'fa-sil2',        s:'success', ms:3700},
+  // ci Silver 1 already success → sensors see it on next poke
+  {t:'fa-sensor-acct', s:'success', ms:4100},
+  {t:'fa-sensor-bill', s:'success', ms:4100},
+  // both Golds unblock
+  {t:'ci-gold',        s:'running', ms:4100},
+  {t:'fa-gold',        s:'running', ms:4300},
+  {t:'ci-gold',        s:'success', ms:5300},
+  {t:'fa-gold',        s:'success', ms:5500},
+];
+
+function runCrossDAG(){
+  resetCrossDAG(false);
+  document.getElementById('cd-btn-run').disabled = true;
+  document.getElementById('cd-btn-reset').disabled = true;
+  document.getElementById('cd-status').textContent =
+    '▶ Both DAGs start at 06:00 · sensors poll carrier_invoice Silver 1 (mode=reschedule)...';
+
+  const maxMs = CD_HAPPY[CD_HAPPY.length - 1].ms + 700;
+  CD_HAPPY.forEach(step => setTimeout(() => setCDState(step.t, step.s), step.ms));
+
+  setTimeout(() => {
+    document.getElementById('cd-btn-run').disabled = false;
+    document.getElementById('cd-btn-reset').disabled = false;
+    document.getElementById('cd-status').textContent =
+      '✅ Both Golds complete. freight_audit waited for carrier_invoice Silver 1 — zero code change, only config.';
+  }, maxMs);
+}
+
+function resetCrossDAG(reEnable = true){
+  CD_NODES.forEach(id => setCDState(id, 'pending'));
+  document.getElementById('cd-status').textContent = 'Ready — click ▶ to simulate';
+  if(reEnable){
+    document.getElementById('cd-btn-run').disabled = false;
+    document.getElementById('cd-btn-reset').disabled = false;
+  }
+  drawCDArrows();
+}
+
 /* ── Initial draw & resize ─────────────────────────────── */
-window.addEventListener('load', () => { drawArrows(); });
-window.addEventListener('resize', drawArrows);
+window.addEventListener('load', () => { drawArrows(); drawCDArrows(); });
+window.addEventListener('resize', () => { drawArrows(); drawCDArrows(); });
 </script>
 </body>
 </html>

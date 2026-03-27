@@ -5,7 +5,7 @@ locals {
       ipynb_path = "${path.module}/../notebooks/shared/shared_functions.ipynb"
     }
     "bronze_ingest_file" = {
-      ipynb_path = "${path.module}/../notebooks/bronze/ingest.ipynb"
+      ipynb_path = "${path.module}/../notebooks/bronze/ingest_file.ipynb"
     }
     "silver1_clean" = {
       ipynb_path = "${path.module}/../notebooks/silver1/clean.ipynb"
