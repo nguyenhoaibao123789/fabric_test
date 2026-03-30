@@ -14,5 +14,5 @@ SELECT DISTINCT
     service_type             AS service_code,
     service_type             AS service_name,
     GETUTCDATE()             AS created_at
-FROM {{ source('silver', 'carrier_invoice') }}
+FROM {{ ref('carrier_invoice') }}
 WHERE service_type IS NOT NULL

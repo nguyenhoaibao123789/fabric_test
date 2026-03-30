@@ -11,12 +11,12 @@
 
 WITH invoice_dates AS (
     SELECT DISTINCT TRY_CAST(invoice_date AS DATE) AS dt
-    FROM {{ source('silver', 'carrier_invoice') }}
+    FROM {{ ref('carrier_invoice') }}
     WHERE invoice_date IS NOT NULL
 ),
 shipment_dates AS (
     SELECT DISTINCT TRY_CAST(shipment_date AS DATE) AS dt
-    FROM {{ source('silver', 'carrier_invoice') }}
+    FROM {{ ref('carrier_invoice') }}
     WHERE shipment_date IS NOT NULL
 ),
 all_dates AS (
@@ -36,8 +36,6 @@ SELECT
     CAST(DAY(dt)                        AS TINYINT)             AS day_of_month,
     CAST(DATEPART(WEEKDAY,  dt)         AS TINYINT)             AS day_of_week,
     DATENAME(WEEKDAY,       dt)                                 AS day_name,
-    CAST(
-        CASE WHEN DATEPART(WEEKDAY, dt) IN (1, 7) THEN 1 ELSE 0 END
-    AS BIT)                                                     AS is_weekend
+    CASE WHEN DATEPART(WEEKDAY, dt) IN (1, 7) THEN 1 ELSE 0 END AS is_weekend
 FROM all_dates
 WHERE dt IS NOT NULL

@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: carrier_invoice
+    description: >
+      Unified carrier invoice — maps each carrier's staging columns to a
+      canonical schema and UNIONs them. One row per invoice line.
+    columns:
+      - name: invoice_number
+        tests:
+          - not_null
+      - name: carrier
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['fedex', 'dhl', 'ups']

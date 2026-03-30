@@ -1,9 +1,6 @@
 locals {
   # Map notebook display name → source .ipynb path
   notebooks = {
-    "shared_functions" = {
-      ipynb_path = "${path.module}/../notebooks/shared/shared_functions.ipynb"
-    }
     "setup_create_silver_tables" = {
       ipynb_path = "${path.module}/../notebooks/setup/create_silver_tables.ipynb"
     }
@@ -12,9 +9,6 @@ locals {
     }
     "silver1_clean" = {
       ipynb_path = "${path.module}/../notebooks/silver1/clean.ipynb"
-    }
-    "silver2_combine" = {
-      ipynb_path = "${path.module}/../notebooks/silver2/combine.ipynb"
     }
   }
 }

@@ -38,7 +38,7 @@ SELECT
     s._source_file,
     s._run_id,
     GETUTCDATE()                                           AS loaded_at
-FROM {{ source('silver', 'carrier_invoice') }}       AS s
+FROM {{ ref('carrier_invoice') }}       AS s
 LEFT JOIN {{ ref('dim_carrier') }}          AS dc
     ON  dc.carrier_code = s.carrier
 LEFT JOIN {{ ref('dim_service_type') }}     AS dst

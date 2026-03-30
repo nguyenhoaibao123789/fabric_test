@@ -10,7 +10,7 @@
 #   dbt run  --profiles-dir . --target dev
 #   dbt test --profiles-dir . --target dev
 
-name: medallion_gold
+name: medallion
 version: "1.0.0"
 profile: fabric_medallion
 
@@ -19,7 +19,12 @@ target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
 models:
-  medallion_gold:
+  medallion:
+    silver:
+      +materialized: incremental
+      +incremental_strategy: merge
+      +on_schema_change: ignore
+      +schema: silver
     gold:
       +materialized: incremental
       +incremental_strategy: merge

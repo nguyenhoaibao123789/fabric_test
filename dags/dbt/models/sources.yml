@@ -8,10 +8,19 @@ sources:
     database: "{{ env_var('DBT_LAKEHOUSE', 'fabric_lakehouse') }}"
     schema: silver
     tables:
+      # ── Silver 1 staging tables (written by notebooks) ──
+      - name: staging_fedex_direct_invoice
+        description: Cleaned FedEx invoice data from Silver 1
+      - name: staging_dhl_direct_invoice
+        description: Cleaned DHL invoice data from Silver 1
+      - name: staging_ups_carrier_report
+        description: Cleaned UPS invoice data from Silver 1
+
+      # ── Silver 2 combined tables (built by dbt) ──
       - name: carrier_invoice
         description: >
-          Unified carrier invoice table produced by Silver 2
-          (build_carrier_invoice notebook). One row per invoice line.
+          Unified carrier invoice table produced by dbt Silver 2 model.
+          One row per invoice line.
         columns:
           - name: invoice_number
             description: Carrier-assigned invoice identifier
@@ -20,7 +29,7 @@ sources:
           - name: shipment_date
             description: Shipment despatch date
           - name: carrier
-            description: Carrier code (e.g. FEDEX, DHL)
+            description: Carrier code (e.g. fedex, dhl, ups)
           - name: service_type
             description: Carrier service level code
           - name: charge_amount

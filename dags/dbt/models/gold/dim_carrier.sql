@@ -13,8 +13,8 @@
 SELECT DISTINCT
     carrier                  AS carrier_code,
     carrier                  AS carrier_name,
-    CAST(1 AS BIT)           AS is_active,
+    1                        AS is_active,
     GETUTCDATE()             AS created_at,
     GETUTCDATE()             AS updated_at
-FROM {{ source('silver', 'carrier_invoice') }}
+FROM {{ ref('carrier_invoice') }}
 WHERE carrier IS NOT NULL

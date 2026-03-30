@@ -1,37 +1,58 @@
 """
-shared_functions.py â€” Shared helper library for Fabric notebooks.
-  - boto3 S3          â†’ azure-storage-file-datalake  (OneLake)
-  - redshift_connector â†’ pyodbc                       (Fabric Data Warehouse)
-  - Secrets Manager   â†’ mssparkutils.credentials      (Azure Key Vault)
+shared_functions.py — Shared helper library for Fabric notebooks.
+  - azure-storage-file-datalake  (OneLake)
+  - pyodbc                       (Fabric Data Warehouse)
+  - mssparkutils.credentials     (Azure Key Vault)
 """
 from __future__ import annotations
 
+import fnmatch
 import logging
 import re
 import struct
-import urllib.parse
+from collections import namedtuple
 from contextlib import contextmanager
 from typing import Iterator
 
 import pyodbc
-
-# mssparkutils is injected by the Fabric Spark runtime â€” available in all notebooks
-try:
-    from notebookutils import mssparkutils  # Fabric runtime name
-except ImportError:
-    try:
-        from pyspark.dbutils import DBUtils  # fallback for local testing
-    except ImportError:
-        mssparkutils = None  # type: ignore
+from notebookutils import mssparkutils
 
 log = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Fabric token credential
+# ---------------------------------------------------------------------------
+
+AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
+
+
+class _FabricTokenCredential:
+    """Wraps mssparkutils.credentials.getToken() to match the
+    azure.identity credential interface (.get_token())."""
+
+    def get_token(self, *scopes, **kwargs):
+        resource = scopes[0].replace("/.default", "") if scopes else "https://storage.azure.com"
+        token = mssparkutils.credentials.getToken(resource)
+        return AccessToken(token=token, expires_on=0)
+
+
+_credential = _FabricTokenCredential()
+
+# ---------------------------------------------------------------------------
+# Secret retrieval
+# ---------------------------------------------------------------------------
+
+
 def get_secret(key_vault_name: str, secret_name: str) -> str:
     """Fetch a secret from Azure Key Vault via mssparkutils."""
-    if mssparkutils is None:
-        raise RuntimeError("mssparkutils not available â€” are you running inside Fabric?")
     kv_url = f"https://{key_vault_name}.vault.azure.net/"
     return mssparkutils.credentials.getSecret(kv_url, secret_name)
+
+
+# ---------------------------------------------------------------------------
+# OneLake / ADLS Gen2 helpers
+# ---------------------------------------------------------------------------
+
 
 def onelake_abfss(workspace_name: str, lakehouse_name: str, path: str = "") -> str:
     """
@@ -47,11 +68,9 @@ def onelake_abfss(workspace_name: str, lakehouse_name: str, path: str = "") -> s
 def get_datalake_client(workspace_name: str):
     """Return an authenticated DataLakeServiceClient for OneLake."""
     from azure.storage.filedatalake import DataLakeServiceClient
-    from azure.identity import DefaultAzureCredential
 
     account_url = "https://onelake.dfs.fabric.microsoft.com"
-    credential = DefaultAzureCredential()
-    return DataLakeServiceClient(account_url=account_url, credential=credential)
+    return DataLakeServiceClient(account_url=account_url, credential=_credential)
 
 
 def list_files(
@@ -64,10 +83,6 @@ def list_files(
     List files under a OneLake prefix matching a glob pattern.
     Returns a list of full ABFS paths.
     """
-    import fnmatch
-    from azure.identity import DefaultAzureCredential
-    from azure.storage.filedatalake import DataLakeServiceClient
-
     client = get_datalake_client(workspace_name)
     fs_name = workspace_name
     item_prefix = f"{lakehouse_name}.lakehouse/Files/{prefix.lstrip('/')}"
@@ -85,11 +100,9 @@ def list_files(
 
 def read_file_bytes(abfss_path: str) -> bytes:
     """Download a file from OneLake and return raw bytes."""
-    from azure.identity import DefaultAzureCredential
     from azure.storage.filedatalake import DataLakeFileClient
 
-    credential = DefaultAzureCredential()
-    client = DataLakeFileClient.from_data_lake_url(abfss_path, credential=credential)
+    client = DataLakeFileClient.from_data_lake_url(abfss_path, credential=_credential)
     downloader = client.download_file()
     return downloader.readall()
 
@@ -102,12 +115,10 @@ def upload_file_bytes(
     overwrite: bool = True,
 ) -> str:
     """Upload bytes to a OneLake path. Returns the ABFS path written."""
-    from azure.identity import DefaultAzureCredential
     from azure.storage.filedatalake import DataLakeServiceClient
 
     account_url = "https://onelake.dfs.fabric.microsoft.com"
-    credential = DefaultAzureCredential()
-    client = DataLakeServiceClient(account_url=account_url, credential=credential)
+    client = DataLakeServiceClient(account_url=account_url, credential=_credential)
 
     fs_client = client.get_file_system_client(workspace_name)
     full_path = f"{lakehouse_name}.lakehouse/Files/{dest_path.lstrip('/')}"
@@ -119,27 +130,24 @@ def upload_file_bytes(
 
 def delete_path(workspace_name: str, lakehouse_name: str, path: str) -> None:
     """Delete a file or directory from OneLake."""
-    from azure.identity import DefaultAzureCredential
     from azure.storage.filedatalake import DataLakeServiceClient
 
     account_url = "https://onelake.dfs.fabric.microsoft.com"
-    credential = DefaultAzureCredential()
-    client = DataLakeServiceClient(account_url=account_url, credential=credential)
+    client = DataLakeServiceClient(account_url=account_url, credential=_credential)
     fs_client = client.get_file_system_client(workspace_name)
     full_path = f"{lakehouse_name}.lakehouse/Files/{path.lstrip('/')}"
     fs_client.delete_directory(full_path)
 
+
+# ---------------------------------------------------------------------------
+# Fabric Data Warehouse connection
+# ---------------------------------------------------------------------------
+
+
 def get_dw_connection(sql_endpoint: str, database: str) -> pyodbc.Connection:
-    """
-    Open a pyodbc connection to a Fabric Data Warehouse using
-    Active Directory Default authentication (Managed Identity / DefaultAzureCredential).
-    """
-    from azure.identity import DefaultAzureCredential
+    """Open a pyodbc connection to a Fabric Data Warehouse using mssparkutils token."""
+    token = _credential.get_token("https://database.windows.net/.default")
 
-    credential = DefaultAzureCredential()
-    token = credential.get_token("https://database.windows.net/.default")
-
-    # Encode the token as required by pyodbc for AAD token auth
     token_bytes = token.token.encode("utf-16-le")
     token_struct = struct.pack(f"<I{len(token_bytes)}s", len(token_bytes), token_bytes)
 
@@ -156,7 +164,7 @@ def get_dw_connection(sql_endpoint: str, database: str) -> pyodbc.Connection:
 
 @contextmanager
 def dw_connection(sql_endpoint: str, database: str) -> Iterator[pyodbc.Connection]:
-    """Context manager for a Fabric DW connection â€” commits on exit, rolls back on error."""
+    """Context manager for a Fabric DW connection — commits on exit, rolls back on error."""
     conn = get_dw_connection(sql_endpoint, database)
     try:
         yield conn
@@ -184,6 +192,12 @@ def query_to_records(conn: pyodbc.Connection, sql: str) -> list[dict]:
     cursor.close()
     return [dict(zip(cols, row)) for row in rows]
 
+
+# ---------------------------------------------------------------------------
+# Column name normalisation
+# ---------------------------------------------------------------------------
+
+
 def normalize_column_name(name: str) -> str:
     """Convert CamelCase / PascalCase / spaces to snake_case."""
     name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
@@ -191,6 +205,11 @@ def normalize_column_name(name: str) -> str:
     name = name.replace(" ", "_").replace("-", "_")
     name = re.sub(r"_+", "_", name)
     return name.lower().strip("_")
+
+
+# ---------------------------------------------------------------------------
+# PySpark DataFrame helpers
+# ---------------------------------------------------------------------------
 
 # Java SimpleDateFormat patterns (used by PySpark to_date)
 _DATE_FORMATS_SPARK = [
@@ -202,7 +221,7 @@ _DATE_FORMATS_SPARK = [
     "yyyyMMdd",
 ]
 
-# Translate Python strftime â†’ Java SimpleDateFormat for callers using strftime strings
+# Translate Python strftime → Java SimpleDateFormat for callers using strftime strings
 _STRFTIME_TO_SPARK: dict[str, str] = {
     "%Y-%m-%d": "yyyy-MM-dd",
     "%m/%d/%Y": "MM/dd/yyyy",
@@ -249,11 +268,11 @@ def spark_truncate_strings(sdf, max_len: int = 65535):
 
 def spark_extract_numeric(sdf, cols: list[str]):
     """Strip currency symbols, commas, spaces and cast to Double.
-    Example: '$1,234.56' â†’ 1234.56,  'N/A' â†’ null"""
+    Example: '$1,234.56' → 1234.56,  'N/A' → null"""
     from pyspark.sql import functions as F
     for c in cols:
         if c not in sdf.columns:
-            log.warning("spark_extract_numeric: column '%s' not found â€” skipping", c)
+            log.warning("spark_extract_numeric: column '%s' not found — skipping", c)
             continue
         sdf = sdf.withColumn(
             c,
@@ -273,7 +292,7 @@ def spark_parse_dates(sdf, cols: list[str], fmt: str | None = None):
     from pyspark.sql import functions as F
     for c in cols:
         if c not in sdf.columns:
-            log.warning("spark_parse_dates: column '%s' not found â€” skipping", c)
+            log.warning("spark_parse_dates: column '%s' not found — skipping", c)
             continue
         if fmt is not None:
             spark_fmt = _STRFTIME_TO_SPARK.get(fmt, fmt)
@@ -308,7 +327,7 @@ def spark_cast_to_schema(sdf, schema):
             try:
                 sdf = sdf.withColumn(field.name, sdf[field.name].cast(field.dataType))
             except Exception as exc:
-                log.warning("spark_cast_to_schema: cannot cast '%s' â€” %s", field.name, exc)
+                log.warning("spark_cast_to_schema: cannot cast '%s' — %s", field.name, exc)
     return sdf
 
 
@@ -320,6 +339,12 @@ def spark_clean_dataframe(sdf):
     sdf = spark_cast_booleans_to_int(sdf)
     sdf = spark_truncate_strings(sdf)
     return sdf
+
+
+# ---------------------------------------------------------------------------
+# Run logging
+# ---------------------------------------------------------------------------
+
 
 def log_run(
     conn: pyodbc.Connection,

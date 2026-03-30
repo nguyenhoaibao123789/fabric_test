@@ -158,29 +158,33 @@ def create_medallion_dag(subject: dict):
             bronze >> silver1
             silver1_task_by_source[src["source_name"]] = silver1
 
-        # ── Phase 3: Silver 2 per entity ──────────────────────────────
+        # ── Phase 3: Silver 2 per entity (dbt) ──────────────────────────
         # All Silver 1 tasks for an entity must succeed before Silver 2
-        # for that entity runs. Keyed by entity name for selective wiring.
-        silver2_task_by_entity: dict[str, FabricRunItemOperator] = {}
+        # dbt model runs. Keyed by entity name for selective wiring.
+        silver2_task_by_entity: dict[str, BashOperator] = {}
 
         for entity, source_names in silver2_entities.items():
-            silver2 = FabricRunItemOperator(
+            # Map silver2_table name to dbt model name
+            # e.g. "silver_carrier_invoice" → "carrier_invoice"
+            dbt_model = entity.removeprefix("silver_") if entity.startswith("silver_") else entity
+
+            silver2 = BashOperator(
                 task_id=f"sil1_to_sil2__{entity}",
-                fabric_conn_id=fabric_conn_id,
-                workspace_id=workspace_id,
-                item_id=notebook_id("silver2_combine"),
-                job_type="RunNotebook",
-                job_params={
-                    "configuration": {
-                        "parameters": {
-                            "entity": entity,
-                            "source_names": json.dumps(source_names),
-                            "env": env,
-                        }
-                    }
+                bash_command=(
+                    "set -e && "
+                    "cd \"${DBT_PROJECT_DIR}\" && "
+                    "dbt deps --profiles-dir . --quiet && "
+                    f"dbt run  --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model} && "
+                    f"dbt test --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}"
+                ),
+                env={
+                    "DBT_PROJECT_DIR":      "/opt/airflow/dags/dbt",
+                    "DBT_TARGET":           env,
+                    "DBT_WAREHOUSE_SERVER": env_config["gold_warehouse_sql_endpoint"],
+                    "DBT_LAKEHOUSE":        env_config["lakehouse"],
                 },
+                append_env=True,
                 outlets=[Dataset(f"{dag_id}/silver2://{entity}")],
-                deferrable=True,
             )
 
             silver2.ui_color  = "#eae8fd"; silver2.ui_fgcolor = "#302880"
