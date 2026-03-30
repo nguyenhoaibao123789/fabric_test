@@ -362,6 +362,7 @@ def log_run(
     layer: str,
     status: str,
     rows_processed: int = 0,
+    file_name: str | None = None,
     error_message: str | None = None,
     run_id: str | None = None,
 ) -> None:
@@ -370,8 +371,8 @@ def log_run(
     conn.execute_sql(
         f"""
         INSERT INTO {db}.data_ops.pipeline_run_log
-            (source_name, layer, status, rows_processed, error_message, run_id, logged_at)
-        VALUES (?, ?, ?, ?, ?, ?, current_timestamp())
+            (source_name, layer, status, rows_processed, file_name, error_message, run_id, logged_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, current_timestamp())
         """,
-        (source_name, layer, status, rows_processed, error_message, run_id),
+        (source_name, layer, status, rows_processed, file_name, error_message, run_id),
     )
