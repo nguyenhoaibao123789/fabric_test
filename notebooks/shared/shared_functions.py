@@ -1,7 +1,7 @@
 """
 shared_functions.py — Shared helper library for Fabric notebooks.
   - azure-storage-file-datalake  (OneLake)
-  - pyodbc                       (Fabric Data Warehouse)
+  - Spark JDBC                   (Fabric Data Warehouse)
   - mssparkutils.credentials     (Azure Key Vault)
 """
 from __future__ import annotations
@@ -9,13 +9,10 @@ from __future__ import annotations
 import fnmatch
 import logging
 import re
-import struct
 from collections import namedtuple
-from contextlib import contextmanager
-from typing import Iterator
 
-import pyodbc
 from notebookutils import mssparkutils
+from pyspark.sql import SparkSession
 
 log = logging.getLogger(__name__)
 
@@ -140,57 +137,70 @@ def delete_path(workspace_name: str, lakehouse_name: str, path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Fabric Data Warehouse connection
+# Fabric Data Warehouse — uses Spark SQL cross-database queries
 # ---------------------------------------------------------------------------
 
 
-def get_dw_connection(sql_endpoint: str, database: str) -> pyodbc.Connection:
-    """Open a pyodbc connection to a Fabric Data Warehouse using mssparkutils token."""
-    token = _credential.get_token("https://database.windows.net/.default")
+class DWConnection:
+    """Wraps Spark SQL for cross-database queries to a Fabric Data Warehouse.
 
-    token_bytes = token.token.encode("utf-16-le")
-    token_struct = struct.pack(f"<I{len(token_bytes)}s", len(token_bytes), token_bytes)
+    Fabric Spark notebooks can query warehouses in the same workspace
+    directly via Spark SQL using three-part names: database.schema.table.
+    No JDBC, pyodbc, or network connections needed.
+    """
 
-    conn_str = (
-        f"DRIVER={{ODBC Driver 18 for SQL Server}};"
-        f"SERVER={sql_endpoint};"
-        f"DATABASE={database};"
-        f"Encrypt=yes;TrustServerCertificate=no;"
-    )
-    conn = pyodbc.connect(conn_str, attrs_before={1256: token_struct})
-    conn.autocommit = False
-    return conn
+    def __init__(self, database: str):
+        
+        self.database = database
+        self.spark = SparkSession.builder.getOrCreate()
+
+    def execute_sql(self, sql: str, params: tuple = ()) -> None:
+        """Execute a DML statement (INSERT/UPDATE/DELETE) via Spark SQL."""
+        if params:
+            sql = self._substitute_params(sql, params)
+        self.spark.sql(sql)
+
+    def query_to_records(self, sql: str) -> list[dict]:
+        """Run a SELECT and return a list of dicts (one per row)."""
+        df = self.spark.sql(sql)
+        return [row.asDict() for row in df.collect()]
+
+    @staticmethod
+    def _substitute_params(sql: str, params: tuple) -> str:
+        """Replace ? placeholders with properly escaped values."""
+        for val in params:
+            if val is None:
+                replacement = "NULL"
+            elif isinstance(val, (int, float)):
+                replacement = str(val)
+            else:
+                escaped = str(val).replace("'", "''")
+                replacement = f"'{escaped}'"
+            sql = sql.replace("?", replacement, 1)
+        return sql
 
 
-@contextmanager
-def dw_connection(sql_endpoint: str, database: str) -> Iterator[pyodbc.Connection]:
-    """Context manager for a Fabric DW connection — commits on exit, rolls back on error."""
-    conn = get_dw_connection(sql_endpoint, database)
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+def dw_connection(sql_endpoint: str, database: str):
+    """Return a DWConnection as a context manager.
+
+    Note: sql_endpoint is accepted for API compatibility but not used —
+    Spark SQL connects to the warehouse by database name directly.
+
+        with dw_connection(endpoint, db) as conn:
+            conn.query_to_records("SELECT ...")
+    """
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _ctx():
+        yield DWConnection(database)
+
+    return _ctx()
 
 
-def execute_sql(conn: pyodbc.Connection, sql: str, params: tuple = ()) -> None:
-    """Execute a DML statement (INSERT/UPDATE/MERGE/EXEC) against Fabric DW."""
-    cursor = conn.cursor()
-    cursor.execute(sql, params)
-    cursor.close()
-
-
-def query_to_records(conn: pyodbc.Connection, sql: str) -> list[dict]:
-    """Run a SELECT and return a list of dicts (one per row)."""
-    cursor = conn.cursor()
-    cursor.execute(sql)
-    cols = [col[0] for col in cursor.description]
-    rows = cursor.fetchall()
-    cursor.close()
-    return [dict(zip(cols, row)) for row in rows]
+def query_to_records(conn: DWConnection, sql: str) -> list[dict]:
+    """Convenience wrapper — delegates to conn.query_to_records()."""
+    return conn.query_to_records(sql)
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +357,7 @@ def spark_clean_dataframe(sdf):
 
 
 def log_run(
-    conn: pyodbc.Connection,
+    conn: DWConnection,
     source_name: str,
     layer: str,
     status: str,
@@ -356,12 +366,12 @@ def log_run(
     run_id: str | None = None,
 ) -> None:
     """Insert a row into data_ops.pipeline_run_log."""
-    execute_sql(
-        conn,
-        """
-        INSERT INTO data_ops.pipeline_run_log
+    db = conn.database
+    conn.execute_sql(
+        f"""
+        INSERT INTO {db}.data_ops.pipeline_run_log
             (source_name, layer, status, rows_processed, error_message, run_id, logged_at)
-        VALUES (?, ?, ?, ?, ?, ?, GETUTCDATE())
+        VALUES (?, ?, ?, ?, ?, ?, current_timestamp())
         """,
         (source_name, layer, status, rows_processed, error_message, run_id),
     )
