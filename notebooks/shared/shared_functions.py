@@ -141,25 +141,11 @@ def delete_path(workspace_name: str, lakehouse_name: str, path: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def query_to_records(sql: str) -> list[dict]:
-    """Run a SELECT against the DW via Spark SQL and return list of dicts."""
+def query_to_records(table: str, query: str) -> list[dict]:
+    """Run a SELECT against a DW table via synapsesql and return list of dicts."""
     spark = SparkSession.builder.getOrCreate()
-    return [row.asDict() for row in spark.sql(sql).collect()]
+    return [row.asDict() for row in spark.read.option("query", query).synapsesql(table).collect()]
 
-
-def write_to_dw(sdf, full_table: str) -> None:
-    """Append a Spark DataFrame to a DW table via synapsesql.
-
-    Args:
-        sdf:        Spark DataFrame to append
-        full_table: three-part name, e.g. "fabric_gold_warehouse.data_ops.pipeline_run_log"
-    """
-    try:
-        sdf.write.mode("append").synapsesql(full_table)
-    except Exception as exc:
-        raise RuntimeError(
-            f"write_to_dw({full_table}): {type(exc).__name__}: {exc}"
-        ) from None
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +295,7 @@ def spark_clean_dataframe(sdf):
 
 
 def log_run(
-    dw_database: str,
+    log_table: str,
     source_name: str,
     layer: str,
     status: str,
@@ -336,4 +322,4 @@ def log_run(
             file_name, error_message, run_id, now)]
     spark = SparkSession.builder.getOrCreate()
     sdf = spark.createDataFrame(row, schema)
-    write_to_dw(sdf, f"{dw_database}.data_ops.pipeline_run_log")
+    sdf.write.mode("append").synapsesql(log_table)

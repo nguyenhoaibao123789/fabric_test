@@ -24,7 +24,7 @@ GO
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES
                WHERE TABLE_SCHEMA = 'data_ops' AND TABLE_NAME = 'pipeline_run_log')
 CREATE TABLE data_ops.pipeline_run_log (
-    log_id          BIGINT          IDENTITY NOT NULL,
+    log_id          BIGINT          NOT NULL,
     source_name     VARCHAR(200)    NOT NULL,
     layer           VARCHAR(20)     NOT NULL,  -- bronze | silver1 | silver2 | gold
     status          VARCHAR(20)     NOT NULL,  -- success | failed
