@@ -15,7 +15,7 @@
             'tracking_number', 'purchase_contract',
             'origin_country', 'destination_country',
             'weight_kg', 'charge_amount', 'charge_currency',
-            'account_number', '_source_file', '_run_id', 'loaded_at'
+            'account_number', 'md_source_file', 'md_run_id', 'loaded_at'
         ]
     )
 }}
@@ -34,9 +34,9 @@ SELECT
     s.charge_amount,
     s.charge_currency,
     s.account_number,
-    s._source_name,
-    s._source_file,
-    s._run_id,
+    s.md_source_name,
+    s.md_source_file,
+    s.md_run_id,
     GETUTCDATE()                                           AS loaded_at
 FROM {{ ref('carrier_invoice') }}       AS s
 LEFT JOIN {{ ref('dim_carrier') }}          AS dc

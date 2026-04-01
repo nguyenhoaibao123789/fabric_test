@@ -142,9 +142,15 @@ def delete_path(workspace_name: str, lakehouse_name: str, path: str) -> None:
 
 
 def query_to_records(table: str, query: str) -> list[dict]:
-    """Run a SELECT against a DW table via synapsesql and return list of dicts."""
+    """Run a SELECT against a Fabric DW via synapsesql passthrough query.
+
+    Uses the Fabric Spark connector pattern:
+        spark.read.option(Constants.DatabaseName, "<warehouse>").synapsesql("<T-SQL>")
+    See: https://learn.microsoft.com/en-us/fabric/data-engineering/spark-data-warehouse-connector
+    """
     spark = SparkSession.builder.getOrCreate()
-    return [row.asDict() for row in spark.read.option("query", query).synapsesql(table).collect()]
+    db = table.split(".")[0]
+    return [row.asDict() for row in spark.read.option(Constants.DatabaseName, db).synapsesql(query).collect()]
 
 
 
@@ -287,6 +293,69 @@ def spark_clean_dataframe(sdf):
     sdf = spark_cast_booleans_to_int(sdf)
     sdf = spark_truncate_strings(sdf)
     return sdf
+
+
+def spark_apply_schema_cleaning(
+    sdf,
+    delta_path: str,
+    date_format: str | None = None,
+    timestamp_format: str | None = None,
+):
+    """Apply schema-driven cleaning based on the destination Delta table.
+
+    Derives amount_cols, date_cols, and timestamp_cols from the existing Delta
+    schema instead of requiring callers to hardcode them. Returns (sdf, table_exists).
+
+    Args:
+        sdf:              Input Spark DataFrame (already basic-cleaned).
+        delta_path:       ABFSS path to the destination Delta table.
+        date_format:      Optional strftime or Java date format for DateType columns.
+        timestamp_format: Optional Java date format for TimestampType columns (default: yyyy-MM-dd HH:mm:ss.SSSSSS).
+
+    Returns:
+        (sdf, table_exists): cleaned DataFrame and bool indicating if table existed.
+    """
+    from pyspark.sql.types import DoubleType, FloatType, DecimalType, DateType, TimestampType
+
+    spark = SparkSession.builder.getOrCreate()
+    try:
+        existing_schema = spark.read.format("delta").load(delta_path).schema
+        table_exists = True
+
+        amount_cols = [
+            f.name for f in existing_schema.fields
+            if isinstance(f.dataType, (DoubleType, FloatType, DecimalType))
+            and f.name in sdf.columns
+        ]
+        date_cols = [
+            f.name for f in existing_schema.fields
+            if isinstance(f.dataType, DateType)
+            and f.name in sdf.columns
+        ]
+        timestamp_cols = [
+            f.name for f in existing_schema.fields
+            if isinstance(f.dataType, TimestampType)
+            and f.name in sdf.columns
+        ]
+
+        if amount_cols:
+            sdf = spark_extract_numeric(sdf, amount_cols)
+            log.info("spark_apply_schema_cleaning: extracted numeric %s", amount_cols)
+
+        if date_cols:
+            sdf = spark_parse_dates(sdf, date_cols, fmt=date_format)
+            log.info("spark_apply_schema_cleaning: parsed dates %s (fmt=%s)", date_cols, date_format or "auto")
+
+        if timestamp_cols:
+            sdf = spark_parse_dates(sdf, timestamp_cols, fmt=timestamp_format)
+            log.info("spark_apply_schema_cleaning: parsed timestamps %s (fmt=%s)", timestamp_cols, timestamp_format or "auto")
+
+        sdf = spark_cast_to_schema(sdf, existing_schema)
+        log.info("spark_apply_schema_cleaning: cast to schema (%d columns)", len(existing_schema.fields))
+    except Exception:
+        table_exists = False
+
+    return sdf, table_exists
 
 
 # ---------------------------------------------------------------------------

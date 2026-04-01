@@ -8,6 +8,5 @@ output "airflow_variables" {
   value = {
     bronze_ingest_file = fabric_notebook.notebooks["bronze_ingest_file"].id
     silver1_clean      = fabric_notebook.notebooks["silver1_clean"].id
-    silver2_combine    = fabric_notebook.notebooks["silver2_combine"].id
   }
 }

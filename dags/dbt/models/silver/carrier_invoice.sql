@@ -1,6 +1,6 @@
--- Silver 2: Unified carrier invoice
+-- dbt: Unified carrier invoice
 -- Maps each carrier's staging columns to a canonical schema and UNIONs them.
--- Replaces the former silver2/combine.ipynb notebook.
+
 --
 -- To add a new carrier:
 --   1. Add its staging table to sources.yml
@@ -10,14 +10,14 @@
 {{
     config(
         unique_key=[
-            'invoice_number', 'carrier', '_source_file'
+            'invoice_number', 'carrier', 'md_source_file'
         ],
         merge_update_columns=[
             'invoice_date', 'purchase_contract', 'tracking_number',
             'shipment_date', 'origin_country', 'destination_country',
             'weight_kg', 'charge_amount', 'charge_currency',
             'service_type', 'account_number',
-            '_source_name', '_run_id'
+            'md_source_name', 'md_run_id'
         ]
     )
 }}
@@ -37,12 +37,12 @@ WITH fedex AS (
         CAST(currency      AS VARCHAR(8000)) AS charge_currency,
         CAST(service_code  AS VARCHAR(8000)) AS service_type,
         CAST(account_no    AS VARCHAR(8000)) AS account_number,
-        _source_name,
-        _source_file,
-        _run_id
+        md_source_name,
+        md_source_file,
+        md_run_id
     FROM {{ source('silver', 'staging_fedex_direct_invoice') }}
     {% if is_incremental() %}
-    WHERE _source_file NOT IN (SELECT DISTINCT _source_file FROM {{ this }} WHERE carrier = 'fedex')
+    WHERE md_source_file NOT IN (SELECT DISTINCT md_source_file FROM {{ this }} WHERE carrier = 'fedex')
     {% endif %}
 ),
 
@@ -61,12 +61,12 @@ dhl AS (
         CAST(currency_code  AS VARCHAR(8000)) AS charge_currency,
         CAST(product_code   AS VARCHAR(8000)) AS service_type,
         CAST(shipper_account AS VARCHAR(8000)) AS account_number,
-        _source_name,
-        _source_file,
-        _run_id
+        md_source_name,
+        md_source_file,
+        md_run_id
     FROM {{ source('silver', 'staging_dhl_direct_invoice') }}
     {% if is_incremental() %}
-    WHERE _source_file NOT IN (SELECT DISTINCT _source_file FROM {{ this }} WHERE carrier = 'dhl')
+    WHERE md_source_file NOT IN (SELECT DISTINCT md_source_file FROM {{ this }} WHERE carrier = 'dhl')
     {% endif %}
 ),
 
@@ -85,12 +85,12 @@ ups AS (
         CAST(currency           AS VARCHAR(8000))  AS charge_currency,
         CAST(service_description AS VARCHAR(8000)) AS service_type,
         CAST(ups_account        AS VARCHAR(8000))  AS account_number,
-        _source_name,
-        _source_file,
-        _run_id
+        md_source_name,
+        md_source_file,
+        md_run_id
     FROM {{ source('silver', 'staging_ups_carrier_report') }}
     {% if is_incremental() %}
-    WHERE _source_file NOT IN (SELECT DISTINCT _source_file FROM {{ this }} WHERE carrier = 'ups')
+    WHERE md_source_file NOT IN (SELECT DISTINCT md_source_file FROM {{ this }} WHERE carrier = 'ups')
     {% endif %}
 )
 
