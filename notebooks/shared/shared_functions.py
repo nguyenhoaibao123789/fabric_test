@@ -6,13 +6,21 @@ shared_functions.py — Shared helper library for Fabric notebooks.
 """
 from __future__ import annotations
 
+import datetime
 import fnmatch
 import logging
+import random
 import re
+import time
 from collections import namedtuple
 
+import com.microsoft.spark.fabric  # noqa: F401
+from azure.storage.filedatalake import DataLakeFileClient, DataLakeServiceClient
+from com.microsoft.spark.fabric.Constants import Constants  # noqa: F401
 from notebookutils import mssparkutils
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+from pyspark.sql.types import *  # noqa: F403
 
 log = logging.getLogger(__name__)
 
@@ -64,8 +72,6 @@ def onelake_abfss(workspace_name: str, lakehouse_name: str, path: str = "") -> s
 
 def get_datalake_client(workspace_name: str):
     """Return an authenticated DataLakeServiceClient for OneLake."""
-    from azure.storage.filedatalake import DataLakeServiceClient
-
     account_url = "https://onelake.dfs.fabric.microsoft.com"
     return DataLakeServiceClient(account_url=account_url, credential=_credential)
 
@@ -97,8 +103,6 @@ def list_files(
 
 def read_file_bytes(abfss_path: str) -> bytes:
     """Download a file from OneLake and return raw bytes."""
-    from azure.storage.filedatalake import DataLakeFileClient
-
     client = DataLakeFileClient.from_data_lake_url(abfss_path, credential=_credential)
     downloader = client.download_file()
     return downloader.readall()
@@ -112,8 +116,6 @@ def upload_file_bytes(
     overwrite: bool = True,
 ) -> str:
     """Upload bytes to a OneLake path. Returns the ABFS path written."""
-    from azure.storage.filedatalake import DataLakeServiceClient
-
     account_url = "https://onelake.dfs.fabric.microsoft.com"
     client = DataLakeServiceClient(account_url=account_url, credential=_credential)
 
@@ -127,8 +129,6 @@ def upload_file_bytes(
 
 def delete_path(workspace_name: str, lakehouse_name: str, path: str) -> None:
     """Delete a file or directory from OneLake."""
-    from azure.storage.filedatalake import DataLakeServiceClient
-
     account_url = "https://onelake.dfs.fabric.microsoft.com"
     client = DataLakeServiceClient(account_url=account_url, credential=_credential)
     fs_client = client.get_file_system_client(workspace_name)
@@ -137,70 +137,29 @@ def delete_path(workspace_name: str, lakehouse_name: str, path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Fabric Data Warehouse — uses Spark SQL cross-database queries
+# Fabric Data Warehouse helpers
 # ---------------------------------------------------------------------------
 
 
-class DWConnection:
-    """Wraps Spark SQL for cross-database queries to a Fabric Data Warehouse.
+def query_to_records(sql: str) -> list[dict]:
+    """Run a SELECT against the DW via Spark SQL and return list of dicts."""
+    spark = SparkSession.builder.getOrCreate()
+    return [row.asDict() for row in spark.sql(sql).collect()]
 
-    Fabric Spark notebooks can query warehouses in the same workspace
-    directly via Spark SQL using three-part names: database.schema.table.
-    No JDBC, pyodbc, or network connections needed.
+
+def write_to_dw(sdf, full_table: str) -> None:
+    """Append a Spark DataFrame to a DW table via synapsesql.
+
+    Args:
+        sdf:        Spark DataFrame to append
+        full_table: three-part name, e.g. "fabric_gold_warehouse.data_ops.pipeline_run_log"
     """
-
-    def __init__(self, database: str):
-        
-        self.database = database
-        self.spark = SparkSession.builder.getOrCreate()
-
-    def execute_sql(self, sql: str, params: tuple = ()) -> None:
-        """Execute a DML statement (INSERT/UPDATE/DELETE) via Spark SQL."""
-        if params:
-            sql = self._substitute_params(sql, params)
-        self.spark.sql(sql)
-
-    def query_to_records(self, sql: str) -> list[dict]:
-        """Run a SELECT and return a list of dicts (one per row)."""
-        df = self.spark.sql(sql)
-        return [row.asDict() for row in df.collect()]
-
-    @staticmethod
-    def _substitute_params(sql: str, params: tuple) -> str:
-        """Replace ? placeholders with properly escaped values."""
-        for val in params:
-            if val is None:
-                replacement = "NULL"
-            elif isinstance(val, (int, float)):
-                replacement = str(val)
-            else:
-                escaped = str(val).replace("'", "''")
-                replacement = f"'{escaped}'"
-            sql = sql.replace("?", replacement, 1)
-        return sql
-
-
-def dw_connection(sql_endpoint: str, database: str):
-    """Return a DWConnection as a context manager.
-
-    Note: sql_endpoint is accepted for API compatibility but not used —
-    Spark SQL connects to the warehouse by database name directly.
-
-        with dw_connection(endpoint, db) as conn:
-            conn.query_to_records("SELECT ...")
-    """
-    from contextlib import contextmanager
-
-    @contextmanager
-    def _ctx():
-        yield DWConnection(database)
-
-    return _ctx()
-
-
-def query_to_records(conn: DWConnection, sql: str) -> list[dict]:
-    """Convenience wrapper — delegates to conn.query_to_records()."""
-    return conn.query_to_records(sql)
+    try:
+        sdf.write.mode("append").synapsesql(full_table)
+    except Exception as exc:
+        raise RuntimeError(
+            f"write_to_dw({full_table}): {type(exc).__name__}: {exc}"
+        ) from None
 
 
 # ---------------------------------------------------------------------------
@@ -249,8 +208,6 @@ def spark_normalize_columns(sdf):
 
 def spark_trim_strings(sdf):
     """Strip leading/trailing whitespace from every string column."""
-    from pyspark.sql import functions as F
-    from pyspark.sql.types import StringType
     str_cols = [f.name for f in sdf.schema.fields if isinstance(f.dataType, StringType)]
     for c in str_cols:
         sdf = sdf.withColumn(c, F.trim(F.col(c)))
@@ -259,7 +216,6 @@ def spark_trim_strings(sdf):
 
 def spark_cast_booleans_to_int(sdf):
     """Convert Boolean columns to Integer (0/1) for DW compatibility."""
-    from pyspark.sql.types import BooleanType
     bool_cols = [f.name for f in sdf.schema.fields if isinstance(f.dataType, BooleanType)]
     for c in bool_cols:
         sdf = sdf.withColumn(c, sdf[c].cast("int"))
@@ -268,8 +224,6 @@ def spark_cast_booleans_to_int(sdf):
 
 def spark_truncate_strings(sdf, max_len: int = 65535):
     """Truncate string columns exceeding max_len characters."""
-    from pyspark.sql import functions as F
-    from pyspark.sql.types import StringType
     str_cols = [f.name for f in sdf.schema.fields if isinstance(f.dataType, StringType)]
     for c in str_cols:
         sdf = sdf.withColumn(c, F.col(c).substr(1, max_len))
@@ -279,7 +233,6 @@ def spark_truncate_strings(sdf, max_len: int = 65535):
 def spark_extract_numeric(sdf, cols: list[str]):
     """Strip currency symbols, commas, spaces and cast to Double.
     Example: '$1,234.56' → 1234.56,  'N/A' → null"""
-    from pyspark.sql import functions as F
     for c in cols:
         if c not in sdf.columns:
             log.warning("spark_extract_numeric: column '%s' not found — skipping", c)
@@ -299,7 +252,6 @@ def spark_parse_dates(sdf, cols: list[str], fmt: str | None = None):
              (e.g. ``"MM/dd/yyyy"``). When None, each format in
              ``_DATE_FORMATS_SPARK`` is tried; the best match wins.
     """
-    from pyspark.sql import functions as F
     for c in cols:
         if c not in sdf.columns:
             log.warning("spark_parse_dates: column '%s' not found — skipping", c)
@@ -357,7 +309,7 @@ def spark_clean_dataframe(sdf):
 
 
 def log_run(
-    conn: DWConnection,
+    dw_database: str,
     source_name: str,
     layer: str,
     status: str,
@@ -366,13 +318,22 @@ def log_run(
     error_message: str | None = None,
     run_id: str | None = None,
 ) -> None:
-    """Insert a row into data_ops.pipeline_run_log."""
-    db = conn.database
-    conn.execute_sql(
-        f"""
-        INSERT INTO {db}.data_ops.pipeline_run_log
-            (source_name, layer, status, rows_processed, file_name, error_message, run_id, logged_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, current_timestamp())
-        """,
-        (source_name, layer, status, rows_processed, file_name, error_message, run_id),
-    )
+    """Insert a row into data_ops.pipeline_run_log via synapsesql."""
+    schema = StructType([
+        StructField("log_id",         LongType(),      False),
+        StructField("source_name",    StringType(),    False),
+        StructField("layer",          StringType(),    False),
+        StructField("status",         StringType(),    False),
+        StructField("rows_processed", IntegerType(),   True),
+        StructField("file_name",      StringType(),    True),
+        StructField("error_message",  StringType(),    True),
+        StructField("run_id",         StringType(),    True),
+        StructField("logged_at",      TimestampType(), True),
+    ])
+    log_id = int(time.time() * 1000000) + random.randint(0, 999999)
+    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    row = [(log_id, source_name, layer, status, int(rows_processed),
+            file_name, error_message, run_id, now)]
+    spark = SparkSession.builder.getOrCreate()
+    sdf = spark.createDataFrame(row, schema)
+    write_to_dw(sdf, f"{dw_database}.data_ops.pipeline_run_log")
