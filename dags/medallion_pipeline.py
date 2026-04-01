@@ -49,9 +49,7 @@ gold_warehouse = env_config["gold_warehouse"]
 
 # ── Default task args ─────────────────────────────────────────────────
 default_args = {
-    "retries": 3,
-    "retry_delay": timedelta(minutes=5),
-    "retry_exponential_backoff": True,
+    "retries": 0,
     "on_failure_callback": on_failure_teams_alert,
     "sla": timedelta(hours=4),
 }
