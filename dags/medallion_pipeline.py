@@ -131,7 +131,7 @@ def create_medallion_dag(subject: dict):
                         }
                     }
                 },
-                deferrable=True,
+                deferrable=False,
             )
 
             # Silver 1: validate + clean + MERGE into staging_{source_name}
@@ -149,7 +149,7 @@ def create_medallion_dag(subject: dict):
                         }
                     }
                 },
-                deferrable=True,
+                deferrable=False,
             )
 
             bronze.ui_color  = "#faebd4"; bronze.ui_fgcolor  = "#4d2c00"
