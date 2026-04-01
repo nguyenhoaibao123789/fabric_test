@@ -1,10 +1,7 @@
 # profiles.yml — dbt-fabric connection profiles
 # ===============================================
-# Authentication uses managed identity (MSI).
-# The Fabric Airflow job's workspace identity is used automatically —
-# no credentials need to be set.
-#
-# Requires: DBT_WAREHOUSE_SERVER env var (set by medallion_pipeline.py from env_config)
+# Authentication uses managed identity (MSI) in Airflow, CLI auth for local runs.
+# Run `az login` before running dbt locally.
 
 fabric_medallion:
   target: dev
@@ -12,7 +9,7 @@ fabric_medallion:
     dev:
       type: fabric
       driver: "ODBC Driver 18 for SQL Server"
-      server: "{{ env_var('DBT_WAREHOUSE_SERVER') }}"
+      server: "8dac972c-0ff1-400f-bba3-e1e2302070b5.datawarehouse.fabric.microsoft.com"
       port: 1433
       database: gold_warehouse
       schema: gold
@@ -24,7 +21,7 @@ fabric_medallion:
     prod:
       type: fabric
       driver: "ODBC Driver 18 for SQL Server"
-      server: "{{ env_var('DBT_WAREHOUSE_SERVER') }}"
+      server: "8dac972c-0ff1-400f-bba3-e1e2302070b5.datawarehouse.fabric.microsoft.com"
       port: 1433
       database: gold_warehouse
       schema: gold
@@ -32,3 +29,4 @@ fabric_medallion:
       encrypt: true
       trust_cert: false
       connect_timeout: 30
+

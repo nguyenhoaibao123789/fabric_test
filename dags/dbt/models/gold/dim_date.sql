@@ -5,9 +5,10 @@
 {{
     config(
         unique_key='date_key',
-        merge_update_columns=[]   -- dates are immutable once inserted
+        merge_update_columns=[]
     )
 }}
+-- dates are immutable once inserted, so no columns need to be updated on merge
 
 WITH invoice_dates AS (
     SELECT DISTINCT TRY_CAST(invoice_date AS DATE) AS dt

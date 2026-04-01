@@ -21,3 +21,9 @@ terraform.tfvars
 .claude/
 
 .vscode/
+
+
+dags/dbt/dbt_packages/
+dags/dbt/target/
+dags/dbt/logs/
+dags/dbt/.user.yml

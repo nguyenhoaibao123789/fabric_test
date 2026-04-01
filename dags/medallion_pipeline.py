@@ -180,7 +180,6 @@ def create_medallion_dag(subject: dict):
                 env={
                     "DBT_PROJECT_DIR":      "/opt/airflow/dags/dbt",
                     "DBT_TARGET":           env,
-                    "DBT_WAREHOUSE_SERVER": env_config["gold_warehouse_sql_endpoint"],
                     "DBT_LAKEHOUSE":        env_config["lakehouse"],
                 },
                 append_env=True,
@@ -240,7 +239,6 @@ def create_gold_dag(gold_cfg: dict):
             env={
                 "DBT_PROJECT_DIR": "/opt/airflow/dags/dbt",
                 "DBT_TARGET":           env,
-                "DBT_WAREHOUSE_SERVER": env_config["gold_warehouse_sql_endpoint"],
                 "DBT_LAKEHOUSE":        env_config["lakehouse"],
             },
             append_env=True,
