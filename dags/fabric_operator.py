@@ -1,34 +1,30 @@
 """
-Custom Fabric notebook operator using MSI (Managed Service Identity).
+Custom Fabric notebook operator using azure-identity DefaultAzureCredential.
 
 Replaces FabricRunItemOperator from apache-airflow-providers-microsoft-fabric,
 which requires service principal credentials not available in this environment.
 
-Authentication: IMDS endpoint (http://169.254.169.254/metadata/token) — available
-automatically in Fabric's managed Airflow; no credentials needed.
+Authentication: azure-identity DefaultAzureCredential — automatically tries
+workload identity, container MSI, environment credentials, and Azure CLI in order.
+azure-identity is bundled with apache-airflow-providers-microsoft-azure 12.0.0.
 """
 import time
 import requests
 from airflow.models import BaseOperator
+from azure.identity import DefaultAzureCredential
 
 
-_FABRIC_RESOURCE = "https://api.fabric.microsoft.com"
+_FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
 _FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
-_IMDS_URL = "http://169.254.169.254/metadata/token"
 _POLL_INTERVAL_SECONDS = 15
 _TERMINAL_STATUSES = {"completed", "succeeded", "success", "failed", "cancelled", "canceled", "deduped"}
 _FAILED_STATUSES = {"failed", "cancelled", "canceled"}
 
+_credential = DefaultAzureCredential()
 
-def _get_msi_token() -> str:
-    resp = requests.get(
-        _IMDS_URL,
-        params={"api-version": "2018-02-01", "resource": _FABRIC_RESOURCE},
-        headers={"Metadata": "true"},
-        timeout=10,
-    )
-    resp.raise_for_status()
-    return resp.json()["access_token"]
+
+def _get_token() -> str:
+    return _credential.get_token(_FABRIC_SCOPE).token
 
 
 class FabricRunItemOperator(BaseOperator):
@@ -61,9 +57,8 @@ class FabricRunItemOperator(BaseOperator):
         self.job_params = job_params or {}
 
     def execute(self, context):
-        token = _get_msi_token()
         headers = {
-            "Authorization": f"Bearer {token}",
+            "Authorization": f"Bearer {_get_token()}",
             "Content-Type": "application/json",
         }
 
@@ -84,9 +79,7 @@ class FabricRunItemOperator(BaseOperator):
         while True:
             time.sleep(_POLL_INTERVAL_SECONDS)
 
-            token = _get_msi_token()
-            headers["Authorization"] = f"Bearer {token}"
-
+            headers["Authorization"] = f"Bearer {_get_token()}"
             poll = requests.get(location, headers=headers, timeout=30)
             poll.raise_for_status()
             data = poll.json()
