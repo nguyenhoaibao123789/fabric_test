@@ -116,12 +116,10 @@ def create_medallion_dag(subject: dict):
                 item_id=notebook_id("bronze_ingest_file"),
                 job_type="RunNotebook",
                 job_params={
-                    "configuration": {
-                        "parameters": {
-                            "source_config": {"value": json.dumps(src), "type": "string"},
-                            "env":           {"value": env,             "type": "string"},
-                        }
-                    }
+                    "parameters": [
+                        {"name": "source_config", "value": json.dumps(src), "type": "Text"},
+                        {"name": "env",           "value": env,             "type": "Text"},
+                    ]
                 },
                 deferrable=False,
             )
@@ -134,12 +132,10 @@ def create_medallion_dag(subject: dict):
                 item_id=notebook_id("silver1_clean"),
                 job_type="RunNotebook",
                 job_params={
-                    "configuration": {
-                        "parameters": {
-                            "source_config": {"value": json.dumps(src), "type": "string"},
-                            "env":           {"value": env,             "type": "string"},
-                        }
-                    }
+                    "parameters": [
+                        {"name": "source_config", "value": json.dumps(src), "type": "Text"},
+                        {"name": "env",           "value": env,             "type": "Text"},
+                    ]
                 },
                 deferrable=False,
             )
