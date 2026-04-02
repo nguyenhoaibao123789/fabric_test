@@ -1,13 +1,13 @@
 environment: dev
-workspace_name: dev-fabric-data
-fabric_workspace_id: 8dac972c-0ff1-400f-bba3-e1e2302070b5
+workspace_name: fabric-dev-workspace
+fabric_workspace_id: 675e276e-a3bd-402d-b3f1-e5636fd01531
 fabric_lakehouse_id: 1e1fab24-f468-454e-b35c-baf4258c2683
 fabric_conn_id: fabric_default
 lakehouse: fabric_lakehouse
 gold_warehouse: fabric_gold_warehouse
-key_vault_name: dev-fabric-kv
-key_vault_url: https://dev-fabric-kv.vault.azure.net/
-gold_warehouse_sql_endpoint: 8dac972c-0ff1-400f-bba3-e1e2302070b5.datawarehouse.fabric.microsoft.com
+# key_vault_name: dev-fabric-kv
+# key_vault_url: https://dev-fabric-kv.vault.azure.net/
+gold_warehouse_sql_endpoint: nv3l45p7irxunojdrwsud5otge-nytv4z55umwubm7r4vrw7uavge.datawarehouse.fabric.microsoft.com
 teams_webhook_secret: teams-webhook-url
 onelake_account: https://onelake.dfs.fabric.microsoft.com
 airflow_variable_env: dev

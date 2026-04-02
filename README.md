@@ -51,7 +51,7 @@ Log in to [app.fabric.microsoft.com](https://app.fabric.microsoft.com) and creat
 
 | Item | Type | Name |
 |---|---|---|
-| Workspace | Workspace | `dev-fabric-data` |
+| Workspace | Workspace | `fabric-dev-workspace` |
 | Medallion storage | Lakehouse | `fabric_lakehouse` |
 | Gold storage | Data Warehouse | `fabric_gold_warehouse` |
 
@@ -77,7 +77,7 @@ Files/
 
 ```yaml
 environment: dev
-workspace_name: dev-fabric-data
+workspace_name: fabric-dev-workspace
 fabric_workspace_id: "<workspace-id>"
 fabric_conn_id: fabric_default
 lakehouse: fabric_lakehouse

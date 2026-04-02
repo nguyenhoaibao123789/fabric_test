@@ -23,10 +23,7 @@ from airflow.datasets import Dataset
 from airflow.decorators import dag
 from airflow.models import Variable
 from airflow.operators.bash import BashOperator
-
-# Custom Fabric operator — uses MSI auth, no service principal needed
-from fabric_operator import FabricRunItemOperator
-from callbacks import on_failure_teams_alert, on_sla_miss_teams_alert
+from apache_airflow_microsoft_fabric_plugin.operators.fabric import FabricRunItemOperator
 
 log = logging.getLogger(__name__)
 
@@ -49,7 +46,6 @@ gold_warehouse = env_config["gold_warehouse"]
 # ── Default task args ─────────────────────────────────────────────────
 default_args = {
     "retries": 0,
-    "on_failure_callback": on_failure_teams_alert,
     "sla": timedelta(hours=4),
 }
 
@@ -91,7 +87,6 @@ def create_medallion_dag(subject: dict):
         start_date=datetime(2026, 1, 1),
         default_args=default_args,
         catchup=False,
-        sla_miss_callback=on_sla_miss_teams_alert,
         tags=["medallion", "fabric", env, subject_name],
         doc_md=f"""
             ## Medallion Pipeline — {subject_name}
@@ -239,7 +234,6 @@ def create_gold_dag(gold_cfg: dict):
                 "DBT_LAKEHOUSE":        env_config["lakehouse"],
             },
             append_env=True,
-            on_failure_callback=on_failure_teams_alert,
         )
         gold.ui_color  = "#fff8e0"; gold.ui_fgcolor = "#7a5800"
 

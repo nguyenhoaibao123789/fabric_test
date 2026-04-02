@@ -62,7 +62,7 @@ def get_secret(key_vault_name: str, secret_name: str) -> str:
 def onelake_abfss(workspace_name: str, lakehouse_name: str, path: str = "") -> str:
     """
     Build an ABFS URI for a path inside a Fabric Lakehouse.
-    Example: abfss://dev-fabric-data@onelake.dfs.fabric.microsoft.com/fabric_lakehouse.lakehouse/Files/bronze/fedex/
+    Example: abfss://fabric-dev-workspace@onelake.dfs.fabric.microsoft.com/fabric_lakehouse.lakehouse/Files/bronze/fedex/
     """
     host = "onelake.dfs.fabric.microsoft.com"
     item = f"{lakehouse_name}.lakehouse"
