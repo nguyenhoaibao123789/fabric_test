@@ -24,9 +24,8 @@ from airflow.decorators import dag
 from airflow.models import Variable
 from airflow.operators.bash import BashOperator
 
-# Fabric custom operators — installed in the Managed Airflow environment
-# pip install apache-airflow-microsoft-fabric-plugin
-from apache_airflow_microsoft_fabric_plugin.operators.fabric import FabricRunItemOperator
+# Fabric operators — apache-airflow-providers-microsoft-fabric
+from airflow.providers.microsoft.fabric.operators.fabric import FabricRunItemOperator
 from callbacks import on_failure_teams_alert, on_sla_miss_teams_alert
 
 log = logging.getLogger(__name__)
