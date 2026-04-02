@@ -9,7 +9,7 @@ fabric_medallion:
     dev:
       type: fabric
       driver: "ODBC Driver 18 for SQL Server"
-      server: "675e276e-a3bd-402d-b3f1-e5636fd01531.datawarehouse.fabric.microsoft.com"
+      server: "31319e6b-a838-4947-9fb0-432f73a3a4c2.datawarehouse.fabric.microsoft.com"
       port: 1433
       database: gold_warehouse
       schema: gold
@@ -21,7 +21,7 @@ fabric_medallion:
     prod:
       type: fabric
       driver: "ODBC Driver 18 for SQL Server"
-      server: "675e276e-a3bd-402d-b3f1-e5636fd01531.datawarehouse.fabric.microsoft.com"
+      server: "31319e6b-a838-4947-9fb0-432f73a3a4c2.datawarehouse.fabric.microsoft.com"
       port: 1433
       database: gold_warehouse
       schema: gold

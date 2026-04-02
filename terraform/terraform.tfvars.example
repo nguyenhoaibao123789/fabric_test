@@ -1,2 +1,1 @@
 workspace_id   = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Fabric workspace GUID from portal URL
-spark_env_name = "dev-spark-env"                          # Display name for the Spark Environment item

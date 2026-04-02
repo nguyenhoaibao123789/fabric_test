@@ -17,6 +17,8 @@ terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform.tfvars
 
+get_refresh_token.py
+
 #Claude
 .claude/
 

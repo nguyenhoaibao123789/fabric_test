@@ -1,1 +1,0 @@
-apache-airflow-microsoft-fabric-plugin

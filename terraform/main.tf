@@ -17,13 +17,6 @@ locals {
 }
 
 
-# ── Spark Environment ──────────────────────────────────────────────────────────
-
-resource "fabric_environment" "spark_env" {
-  workspace_id = var.workspace_id
-  display_name = var.spark_env_name
-}
-
 # ── Notebooks ──────────────────────────────────────────────────────────────────
 
 resource "fabric_notebook" "notebooks" {
@@ -39,6 +32,4 @@ resource "fabric_notebook" "notebooks" {
       processing_mode = "None"
     }
   }
-
-  depends_on = [fabric_environment.spark_env]
 }

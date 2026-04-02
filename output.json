@@ -5,70 +5,70 @@
       "type": "SQLEndpoint",
       "displayName": "fabric_lakehouse",
       "description": "",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "bee630b9-6f46-401d-88ef-8616f360c20c",
       "type": "Warehouse",
       "displayName": "fabric_gold_warehouse",
       "description": "",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "1e1fab24-f468-454e-b35c-baf4258c2683",
       "type": "Lakehouse",
       "displayName": "fabric_lakehouse",
       "description": "",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "3a7e1a00-cdc9-47cf-be6b-8833dcba4673",
       "type": "Environment",
       "displayName": "medallion-env-dev",
       "description": "",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "2a8b10ff-a3ee-490a-85cc-0190cd5f41af",
       "type": "Notebook",
       "displayName": "silver1_clean",
       "description": "",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "4c079b2a-da38-4604-b5c9-fb783938d858",
       "type": "ApacheAirflowJob",
       "displayName": "test_airflow",
       "description": "",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "376c724c-a83b-41c0-8b1a-b5150f555dc3",
       "type": "Notebook",
       "displayName": "bronze_ingest_file",
       "description": "",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "21ec5a27-57da-4a64-a9b4-cd415b7ce113",
       "type": "Notebook",
       "displayName": "setup_create_silver_tables",
       "description": "",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "3fb2012a-94e3-4d4f-9009-3284f31f9997",
       "type": "Notebook",
       "displayName": "test_bronze_ingest",
       "description": "New notebook",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     },
     {
       "id": "aa6b5eea-5206-4638-b9e5-becc3e6d20a5",
       "type": "Notebook",
       "displayName": "test_silver1_clean",
       "description": "New notebook",
-      "workspaceId": "675e276e-a3bd-402d-b3f1-e5636fd01531"
+      "workspaceId": "31319e6b-a838-4947-9fb0-432f73a3a4c2"
     }
   ]
 }

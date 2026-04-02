@@ -29,7 +29,7 @@ def hello_world_dag():
         task_id="run_hello_world_notebook",
         fabric_conn_id=fabric_conn_id,
         workspace_id=workspace_id,
-        item_id=Variable.get("hello_world_notebook_id", default_var=""),
+        item_id=Variable.get("hello_world", default_var=""),
         job_type="RunNotebook",
         deferrable=False,
     )
