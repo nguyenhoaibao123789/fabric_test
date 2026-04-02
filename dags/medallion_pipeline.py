@@ -24,8 +24,8 @@ from airflow.decorators import dag
 from airflow.models import Variable
 from airflow.operators.bash import BashOperator
 
-# Fabric operators — apache-airflow-providers-microsoft-fabric
-from airflow.providers.microsoft.fabric.operators.fabric import FabricRunItemOperator
+# Custom Fabric operator — uses MSI auth, no service principal needed
+from fabric_operator import FabricRunItemOperator
 from callbacks import on_failure_teams_alert, on_sla_miss_teams_alert
 
 log = logging.getLogger(__name__)
