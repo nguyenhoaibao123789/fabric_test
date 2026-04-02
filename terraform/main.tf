@@ -10,6 +10,9 @@ locals {
     "silver1_clean" = {
       ipynb_path = "${path.module}/../notebooks/silver1/clean.ipynb"
     }
+    "hello_world" = {
+      ipynb_path = "${path.module}/../notebooks/test/hello_world.ipynb"
+    }
   }
 }
 
