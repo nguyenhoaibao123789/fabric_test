@@ -1,1 +1,1 @@
-workspace_id   = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Fabric workspace GUID from portal URL
+env = "dev"  # must match a file in dags/config/<env>.yaml

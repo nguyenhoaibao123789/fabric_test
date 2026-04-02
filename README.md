@@ -128,9 +128,10 @@ cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 Edit `terraform/terraform.tfvars`:
 
 ```hcl
-workspace_id   = "<workspace-id>"
-spark_env_name = "dev-spark-env"
+env = "dev"  # must match a file in dags/config/<env>.yaml
 ```
+
+Terraform reads `workspace_id` and `lakehouse_id` directly from `dags/config/dev.yaml` — no duplication needed.
 
 > `terraform.tfvars` is gitignored — never commit it.
 
@@ -168,29 +169,73 @@ apache-airflow-microsoft-fabric-plugin
 
 Click **Apply**, then **Stop** and **Start** the Airflow job.
 
-### Step 11 — Create Fabric connection in Airflow
+### Step 11 — Register an app in Azure AD and create Fabric connection in Airflow
+
+#### 11a — Register an app in Azure AD
+
+1. Go to [portal.azure.com](https://portal.azure.com) and sign in with your **org account**
+2. Navigate to **Azure Active Directory → App registrations → New registration**
+   - Name: anything (e.g. `fabric-service-principal`)
+   - Supported account types: **Accounts in this organizational directory only**
+   - Click **Register**
+3. Note the **Application (client) ID** and **Directory (tenant) ID**
+4. Go to **API permissions → Add a permission → Power BI Service → Delegated permissions**
+   - Add `Item.Execute.All` and `Item.Read.All`
+   - Click **Add permissions** (do NOT click "Grant admin consent" — not needed for delegated flow)
+5. Go to **Authentication → Advanced settings**
+   - Set **"Allow public client flows"** to **Yes**
+   - Click **Save**
+
+#### 11b — Get a refresh token
+
+Update `get_refresh_token.py` with your tenant ID and client ID, then run it:
+
+```bash
+python get_refresh_token.py
+```
+
+It will print a device code URL. Open it, sign in as your org account, and consent to the permissions.
+Copy the **REFRESH TOKEN** from the output.
+
+> The refresh token expires after ~90 days of inactivity. Re-run the script to get a new one when needed.
+
+#### 11c — Create the connection in Airflow UI
 
 In the Airflow UI (**Monitor Airflow** → **Admin → Connections → + Add**):
 
 | Field | Value |
 |---|---|
 | Conn Id | `fabric_default` |
-| Conn Type | Microsoft Fabric |
+| Conn Type | Generic |
+| Login | Your **Client ID** (from Step 11a) |
+| Password | The **refresh token** (from Step 11b) |
+| Extra | See JSON below |
 
-Authentication uses the workspace managed identity — no Azure credentials required.
+**Extra field:**
+```json
+{
+    "tenantId": "<your-tenant-id>",
+    "scopes": "https://api.fabric.microsoft.com/Item.Execute.All https://api.fabric.microsoft.com/Item.Read.All offline_access"
+}
+```
+
+Click **Save**.
 
 ### Step 12 — Import Airflow Variables
 
-After `terraform apply`, generate the variables file:
+After `terraform apply`, print the notebook IDs:
 
 ```bash
 cd terraform
-terraform output -json airflow_variables > ../airflow-variables.json
+terraform output
 ```
 
-Then in the Airflow UI → **Admin → Variables → Import Variables**, upload `airflow-variables.json`.
+Then in the Airflow UI → **Admin → Variables**, add each key/value manually:
 
-> `airflow-variables.json` is gitignored — it contains notebook IDs tied to your specific workspace.
+| Key | Value |
+|---|---|
+| `bronze_ingest_file` | ID from output |
+| `silver1_clean` | ID from output |
 
 ---
 

@@ -1,5 +1,6 @@
-variable "workspace_id" {
+variable "env" {
   type        = string
-  description = "Fabric workspace ID — copy from the workspace URL in the Fabric portal"
+  description = "Environment name — must match a file in dags/config/<env>.yaml. Default: dev"
+  default     = "dev"
 }
 
