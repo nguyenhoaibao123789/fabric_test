@@ -118,8 +118,8 @@ def create_medallion_dag(subject: dict):
                 job_params={
                     "configuration": {
                         "parameters": {
-                            "source_config": json.dumps(src),
-                            "env": env,
+                            "source_config": {"value": json.dumps(src), "type": "string"},
+                            "env":           {"value": env,             "type": "string"},
                         }
                     }
                 },
@@ -136,8 +136,8 @@ def create_medallion_dag(subject: dict):
                 job_params={
                     "configuration": {
                         "parameters": {
-                            "source_config": json.dumps(src),
-                            "env": env,
+                            "source_config": {"value": json.dumps(src), "type": "string"},
+                            "env":           {"value": env,             "type": "string"},
                         }
                     }
                 },
