@@ -36,7 +36,6 @@ class FabricRunNotebookOperator(FabricRunItemOperator):
 
     def execute(self, context):
         hook = FabricHook(fabric_conn_id=self.fabric_conn_id)
-        headers = hook.get_headers()
 
         url = (
             f"https://api.fabric.microsoft.com/v1/workspaces/{self.workspace_id}"
@@ -47,8 +46,7 @@ class FabricRunNotebookOperator(FabricRunItemOperator):
         if self.job_params:
             body["parameters"] = self.job_params
 
-        import requests
-        response = requests.post(url, headers=headers, json=body)
+        response = hook._send_request("POST", url, headers=hook.get_headers(), json=body)
         response.raise_for_status()
 
         location = response.headers.get("Location")
