@@ -147,6 +147,15 @@ def create_medallion_dag(subject: dict):
 
         # ── Phase 1 + 2: Bronze + Silver 1 per source ─────────────────
         for src in sources:
+            src_with_ids = {
+                **src,
+                "workspace_id": env_config["fabric_workspace_id"],
+                "lakehouse_id": env_config["fabric_lakehouse_id"],
+                "warehouse_id": env_config["fabric_warehouse_id"],
+                "gold_warehouse_sql_endpoint": env_config["gold_warehouse_sql_endpoint"],
+                "gold_warehouse": env_config["gold_warehouse"],
+            }
+
             # Bronze: copy raw file into Bronze Lakehouse / Files/
             bronze = FabricRunNotebookOperator(
                 task_id=f"src_to_brz__{src['source_name']}",
@@ -155,8 +164,8 @@ def create_medallion_dag(subject: dict):
                 item_id=notebook_id("bronze_ingest_file"),
                 job_type="RunNotebook",
                 job_params=[
-                    {"name": "source_config", "value": json.dumps(src), "type": "Text"},
-                    {"name": "env",           "value": env,             "type": "Text"},
+                    {"name": "source_config", "value": json.dumps(src_with_ids), "type": "Text"},
+                    {"name": "env",           "value": env,                       "type": "Text"},
                 ],
                 deferrable=False,
             )
@@ -169,8 +178,8 @@ def create_medallion_dag(subject: dict):
                 item_id=notebook_id("silver1_clean"),
                 job_type="RunNotebook",
                 job_params=[
-                    {"name": "source_config", "value": json.dumps(src), "type": "Text"},
-                    {"name": "env",           "value": env,             "type": "Text"},
+                    {"name": "source_config", "value": json.dumps(src_with_ids), "type": "Text"},
+                    {"name": "env",           "value": env,                       "type": "Text"},
                 ],
                 deferrable=False,
             )
