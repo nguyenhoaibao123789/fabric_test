@@ -30,28 +30,32 @@ from apache_airflow_microsoft_fabric_plugin.hooks.fabric import FabricHook
 class FabricRunNotebookOperator(FabricRunItemOperator):
     """
     Extends FabricRunItemOperator to fix notebook parameter injection.
-    The base plugin wraps job_params as {"executionData": {"parameters": ...}}
-    but Fabric expects parameters at the top level of the request body.
+    The base hook sends: {"executionData": {"parameters": job_params}}
+    So job_params must be a dict keyed by param name: {name: {value, type}}
+    not a list — which is what the base operator passes through as-is.
     """
 
     def execute(self, context):
         hook = FabricHook(fabric_conn_id=self.fabric_conn_id)
 
-        url = (
-            f"https://api.fabric.microsoft.com/v1/workspaces/{self.workspace_id}"
-            f"/items/{self.item_id}/jobs/instances?jobType={self.job_type}"
-        )
-
-        body = {}
+        # Convert list [{name, value, type}] → dict {name: {value, type}}
+        # so the hook sends {"executionData": {"parameters": {name: {value, type}}}}
+        params_dict = None
         if self.job_params:
-            body["parameters"] = self.job_params
+            params_dict = {
+                p["name"]: {"value": p["value"], "type": p["type"]}
+                for p in self.job_params
+            }
 
-        response = hook._send_request("POST", url, headers=hook.get_headers(), json=body)
-        response.raise_for_status()
+        import json as _json
+        self.log.info("[FabricRunNotebookOperator] job_params body: %s", _json.dumps({"executionData": {"parameters": params_dict}}))
 
-        location = response.headers.get("Location")
-        if not location:
-            raise Exception("No Location header in Fabric response")
+        location = hook.run_fabric_item(
+            workspace_id=self.workspace_id,
+            item_id=self.item_id,
+            job_type=self.job_type,
+            job_params=params_dict,
+        )
 
         succeeded = hook.wait_for_item_run_status(
             location,
@@ -162,8 +166,8 @@ def create_medallion_dag(subject: dict):
                 item_id=notebook_id("bronze_ingest_file"),
                 job_type="RunNotebook",
                 job_params=[
-                    {"name": "source_config", "value": json.dumps(src_with_ids), "type": "Text"},
-                    {"name": "env",           "value": env,                       "type": "Text"},
+                    {"name": "source_config", "value": json.dumps(src_with_ids), "type": "string"},
+                    {"name": "env",           "value": env,                       "type": "string"},
                 ],
                 deferrable=False,
             )
@@ -176,8 +180,8 @@ def create_medallion_dag(subject: dict):
                 item_id=notebook_id("silver1_clean"),
                 job_type="RunNotebook",
                 job_params=[
-                    {"name": "source_config", "value": json.dumps(src_with_ids), "type": "Text"},
-                    {"name": "env",           "value": env,                       "type": "Text"},
+                    {"name": "source_config", "value": json.dumps(src_with_ids), "type": "string"},
+                    {"name": "env",           "value": env,                       "type": "string"},
                 ],
                 deferrable=False,
             )
