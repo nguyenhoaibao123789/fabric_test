@@ -24,6 +24,43 @@ from airflow.decorators import dag
 from airflow.models import Variable
 from airflow.operators.bash import BashOperator
 from apache_airflow_microsoft_fabric_plugin.operators.fabric import FabricRunItemOperator
+from apache_airflow_microsoft_fabric_plugin.hooks.fabric import FabricHook
+
+
+class FabricRunNotebookOperator(FabricRunItemOperator):
+    """
+    Extends FabricRunItemOperator to fix notebook parameter injection.
+    The base plugin wraps job_params as {"executionData": {"parameters": ...}}
+    but Fabric expects parameters at the top level of the request body.
+    """
+
+    def execute(self, context):
+        hook = FabricHook(fabric_conn_id=self.fabric_conn_id)
+        headers = hook.get_headers()
+
+        url = (
+            f"https://api.fabric.microsoft.com/v1/workspaces/{self.workspace_id}"
+            f"/items/{self.item_id}/jobs/instances?jobType={self.job_type}"
+        )
+
+        body = {}
+        if self.job_params:
+            body["parameters"] = self.job_params
+
+        import requests
+        response = requests.post(url, headers=headers, json=body)
+        response.raise_for_status()
+
+        location = response.headers.get("Location")
+        if not location:
+            raise Exception("No Location header in Fabric response")
+
+        hook.wait_for_item_run_status(
+            location,
+            target_status="Completed",
+            check_interval=self.check_interval if hasattr(self, "check_interval") else 60,
+            timeout=self.timeout if hasattr(self, "timeout") else 3600,
+        )
 
 log = logging.getLogger(__name__)
 
@@ -104,12 +141,12 @@ def create_medallion_dag(subject: dict):
 
         # ── Bookkeeping ────────────────────────────────────────────────
         # Maps source_name → the silver1 FabricRunItemOperator task
-        silver1_task_by_source: dict[str, FabricRunItemOperator] = {}
+        silver1_task_by_source: dict[str, FabricRunNotebookOperator] = {}
 
         # ── Phase 1 + 2: Bronze + Silver 1 per source ─────────────────
         for src in sources:
             # Bronze: copy raw file into Bronze Lakehouse / Files/
-            bronze = FabricRunItemOperator(
+            bronze = FabricRunNotebookOperator(
                 task_id=f"src_to_brz__{src['source_name']}",
                 fabric_conn_id=fabric_conn_id,
                 workspace_id=workspace_id,
@@ -123,7 +160,7 @@ def create_medallion_dag(subject: dict):
             )
 
             # Silver 1: validate + clean + MERGE into staging_{source_name}
-            silver1 = FabricRunItemOperator(
+            silver1 = FabricRunNotebookOperator(
                 task_id=f"brz_to_sil1__{src['source_name']}",
                 fabric_conn_id=fabric_conn_id,
                 workspace_id=workspace_id,
