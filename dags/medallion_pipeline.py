@@ -23,7 +23,7 @@ from airflow.datasets import Dataset
 from airflow.decorators import dag
 from airflow.models import Variable
 from airflow.operators.bash import BashOperator
-from airflow.providers.microsoft.fabric.operators.run_item import MSFabricRunJobOperator, MSFabricNotebookJobParameters
+from apache_airflow_microsoft_fabric_plugin.operators.fabric import FabricRunItemOperator
 
 log = logging.getLogger(__name__)
 
@@ -103,40 +103,36 @@ def create_medallion_dag(subject: dict):
     def dag_fn():
 
         # ── Bookkeeping ────────────────────────────────────────────────
-        # Maps source_name → the silver1 MSFabricRunJobOperator task
-        silver1_task_by_source: dict[str, MSFabricRunJobOperator] = {}
+        # Maps source_name → the silver1 FabricRunItemOperator task
+        silver1_task_by_source: dict[str, FabricRunItemOperator] = {}
 
         # ── Phase 1 + 2: Bronze + Silver 1 per source ─────────────────
         for src in sources:
             # Bronze: copy raw file into Bronze Lakehouse / Files/
-            bronze = MSFabricRunJobOperator(
+            bronze = FabricRunItemOperator(
                 task_id=f"src_to_brz__{src['source_name']}",
                 fabric_conn_id=fabric_conn_id,
                 workspace_id=workspace_id,
                 item_id=notebook_id("bronze_ingest_file"),
                 job_type="RunNotebook",
-                job_params=(
-                    MSFabricNotebookJobParameters()
-                    .set_parameter("source_config", json.dumps(src), "string")
-                    .set_parameter("env", env, "string")
-                    .to_json()
-                ),
+                job_params=[
+                    {"name": "source_config", "value": json.dumps(src), "type": "Text"},
+                    {"name": "env",           "value": env,             "type": "Text"},
+                ],
                 deferrable=False,
             )
 
             # Silver 1: validate + clean + MERGE into staging_{source_name}
-            silver1 = MSFabricRunJobOperator(
+            silver1 = FabricRunItemOperator(
                 task_id=f"brz_to_sil1__{src['source_name']}",
                 fabric_conn_id=fabric_conn_id,
                 workspace_id=workspace_id,
                 item_id=notebook_id("silver1_clean"),
                 job_type="RunNotebook",
-                job_params=(
-                    MSFabricNotebookJobParameters()
-                    .set_parameter("source_config", json.dumps(src), "string")
-                    .set_parameter("env", env, "string")
-                    .to_json()
-                ),
+                job_params=[
+                    {"name": "source_config", "value": json.dumps(src), "type": "Text"},
+                    {"name": "env",           "value": env,             "type": "Text"},
+                ],
                 deferrable=False,
             )
 

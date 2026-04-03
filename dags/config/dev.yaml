@@ -2,7 +2,7 @@ environment: dev
 workspace_name: fabric_test_2
 fabric_workspace_id: 31319e6b-a838-4947-9fb0-432f73a3a4c2
 fabric_lakehouse_id: 046e1327-23e8-4aee-a475-06aea430f92c
-fabric_conn_id: fabric_default
+fabric_conn_id: generic_default
 lakehouse: fabric_lakehouse
 gold_warehouse: fabric_gold_warehouse
 fabric_warehouse_id: 7e2b4592-ffe5-4fa3-8909-49a25083cd09
