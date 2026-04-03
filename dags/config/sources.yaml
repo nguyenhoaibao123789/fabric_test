@@ -9,7 +9,7 @@ subjects:
         carrier: fedex
         landing_path: landing/fedex/invoice/
         bronze_path: bronze/fedex/invoice/
-        bronze_file_pattern: "*.csv"
+        file_format: csv
         silver1_table: staging_fedex_direct_invoice
         silver2_table: silver_carrier_invoice
         extra_params:
@@ -21,7 +21,7 @@ subjects:
         carrier: dhl
         landing_path: landing/dhl/invoice/
         bronze_path: bronze/dhl/invoice/
-        bronze_file_pattern: "*.csv"
+        file_format: csv
         silver1_table: staging_dhl_direct_invoice
         silver2_table: silver_carrier_invoice
         extra_params:
@@ -33,7 +33,7 @@ subjects:
         carrier: ups
         landing_path: landing/ups/carrier/
         bronze_path: bronze/ups/carrier/
-        bronze_file_pattern: "*.xlsx"
+        file_format: excel
         silver1_table: staging_ups_carrier_report
         silver2_table: silver_carrier_invoice
         extra_params:
@@ -51,7 +51,7 @@ subjects:
         carrier: usps
         landing_path: landing/usps/tracking/
         bronze_path: bronze/usps/tracking/
-        bronze_file_pattern: "*.parquet"
+        file_format: parquet
         silver1_table: staging_usps_tracking
         silver2_table: silver_carrier_tracking
         is_enabled: true
@@ -66,7 +66,7 @@ subjects:
         carrier: fedex
         landing_path: landing/fedex/rate_card/
         bronze_path: bronze/fedex/rate_card/
-        bronze_file_pattern: "*.xlsx"
+        file_format: excel
         silver1_table: staging_fedex_rate_card
         silver2_table: silver_carrier_rate_card
         extra_params:
