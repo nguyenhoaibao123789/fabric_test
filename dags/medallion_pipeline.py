@@ -55,12 +55,14 @@ class FabricRunNotebookOperator(FabricRunItemOperator):
         if not location:
             raise Exception("No Location header in Fabric response")
 
-        hook.wait_for_item_run_status(
+        succeeded = hook.wait_for_item_run_status(
             location,
             target_status="Completed",
             check_interval=self.check_interval if hasattr(self, "check_interval") else 60,
             timeout=self.timeout if hasattr(self, "timeout") else 3600,
         )
+        if not succeeded:
+            raise Exception(f"Notebook run failed for item_id={self.item_id}")
 
 log = logging.getLogger(__name__)
 
