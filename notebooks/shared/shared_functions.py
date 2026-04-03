@@ -59,13 +59,18 @@ def get_secret(key_vault_name: str, secret_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+_GUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+
 def onelake_abfss(workspace_name: str, lakehouse_name: str, path: str = "") -> str:
     """
     Build an ABFS URI for a path inside a Fabric Lakehouse.
-    Example: abfss://fabric-dev-workspace@onelake.dfs.fabric.microsoft.com/fabric_lakehouse.lakehouse/Files/bronze/fedex/
+    Accepts both display names and GUIDs:
+      names: abfss://<workspace>@onelake.dfs.fabric.microsoft.com/<lakehouse>.lakehouse/<path>
+      guids: abfss://<workspace_guid>@onelake.dfs.fabric.microsoft.com/<lakehouse_guid>/<path>
     """
     host = "onelake.dfs.fabric.microsoft.com"
-    item = f"{lakehouse_name}.lakehouse"
+    item = lakehouse_name if _GUID_RE.match(lakehouse_name) else f"{lakehouse_name}.lakehouse"
     base = f"abfss://{workspace_name}@{host}/{item}"
     return f"{base}/{path.lstrip('/')}" if path else base
 
@@ -88,7 +93,8 @@ def list_files(
     """
     client = get_datalake_client(workspace_name)
     fs_name = workspace_name
-    item_prefix = f"{lakehouse_name}.lakehouse/Files/{prefix.lstrip('/')}"
+    item = lakehouse_name if _GUID_RE.match(lakehouse_name) else f"{lakehouse_name}.lakehouse"
+    item_prefix = f"{item}/Files/{prefix.lstrip('/')}"
 
     fs_client = client.get_file_system_client(fs_name)
     paths = fs_client.get_paths(path=item_prefix, recursive=False)
