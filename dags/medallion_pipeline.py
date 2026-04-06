@@ -27,6 +27,9 @@ from apache_airflow_microsoft_fabric_plugin.operators.fabric import FabricRunIte
 from apache_airflow_microsoft_fabric_plugin.hooks.fabric import FabricHook
 
 
+_DAG_DIR = Path(__file__).parent
+
+
 class FabricRunNotebookOperator(FabricRunItemOperator):
     """
     Extends FabricRunItemOperator to fix notebook parameter injection.
@@ -212,7 +215,7 @@ def create_medallion_dag(subject: dict):
                     f"dbt test --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}"
                 ),
                 env={
-                    "DBT_PROJECT_DIR":      "/opt/airflow/dags/dbt",
+                    "DBT_PROJECT_DIR":      str(_DAG_DIR / "dbt"),
                     "DBT_TARGET":           env,
                     "DBT_LAKEHOUSE":        env_config["lakehouse"],
                 },
