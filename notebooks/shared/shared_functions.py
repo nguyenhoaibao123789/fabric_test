@@ -59,19 +59,13 @@ def get_secret(key_vault_name: str, secret_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-_GUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
-
-
-def onelake_abfss(workspace_name: str, lakehouse_name: str, path: str = "") -> str:
+def onelake_abfss(workspace_id: str, lakehouse_id: str, path: str = "") -> str:
     """
-    Build an ABFS URI for a path inside a Fabric Lakehouse.
-    Accepts both display names and GUIDs:
-      names: abfss://<workspace>@onelake.dfs.fabric.microsoft.com/<lakehouse>.lakehouse/<path>
-      guids: abfss://<workspace_guid>@onelake.dfs.fabric.microsoft.com/<lakehouse_guid>/<path>
+    Build an ABFS URI for a path inside a Fabric Lakehouse using GUIDs.
+    abfss://<workspace_id>@onelake.dfs.fabric.microsoft.com/<lakehouse_id>/<path>
     """
     host = "onelake.dfs.fabric.microsoft.com"
-    item = lakehouse_name if _GUID_RE.match(lakehouse_name) else f"{lakehouse_name}.lakehouse"
-    base = f"abfss://{workspace_name}@{host}/{item}"
+    base = f"abfss://{workspace_id}@{host}/{lakehouse_id}"
     return f"{base}/{path.lstrip('/')}" if path else base
 
 
@@ -93,8 +87,7 @@ def list_files(
     """
     client = get_datalake_client(workspace_name)
     fs_name = workspace_name
-    item = lakehouse_name if _GUID_RE.match(lakehouse_name) else f"{lakehouse_name}.lakehouse"
-    item_prefix = f"{item}/Files/{prefix.lstrip('/')}"
+    item_prefix = f"{lakehouse_name}/Files/{prefix.lstrip('/')}"
 
     fs_client = client.get_file_system_client(fs_name)
     paths = fs_client.get_paths(path=item_prefix, recursive=False)
@@ -126,7 +119,7 @@ def upload_file_bytes(
     client = DataLakeServiceClient(account_url=account_url, credential=_credential)
 
     fs_client = client.get_file_system_client(workspace_name)
-    full_path = f"{lakehouse_name}.lakehouse/Files/{dest_path.lstrip('/')}"
+    full_path = f"{lakehouse_name}/Files/{dest_path.lstrip('/')}"
     file_client = fs_client.get_file_client(full_path)
     file_client.upload_data(data, overwrite=overwrite)
 
@@ -138,7 +131,7 @@ def delete_path(workspace_name: str, lakehouse_name: str, path: str) -> None:
     account_url = "https://onelake.dfs.fabric.microsoft.com"
     client = DataLakeServiceClient(account_url=account_url, credential=_credential)
     fs_client = client.get_file_system_client(workspace_name)
-    full_path = f"{lakehouse_name}.lakehouse/Files/{path.lstrip('/')}"
+    full_path = f"{lakehouse_name}/Files/{path.lstrip('/')}"
     fs_client.delete_directory(full_path)
 
 
