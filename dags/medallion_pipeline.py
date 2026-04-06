@@ -209,6 +209,7 @@ def create_medallion_dag(subject: dict):
                 task_id=f"sil1_to_sil2__{entity}",
                 bash_command=(
                     "set -e && "
+                    "dbt --version && "
                     "cd \"${DBT_PROJECT_DIR}\" && "
                     "dbt deps --profiles-dir . --quiet && "
                     f"dbt run  --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model} && "
