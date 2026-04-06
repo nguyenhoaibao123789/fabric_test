@@ -17,7 +17,7 @@
             'shipment_date', 'origin_country', 'destination_country',
             'weight_kg', 'charge_amount', 'charge_currency',
             'service_type', 'account_number',
-            'md_source_name', 'md_run_id'
+            'md_source_name', 'md_run_id', 'md_updated_at'
         ]
     )
 }}

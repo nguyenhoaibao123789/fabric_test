@@ -10,7 +10,7 @@
     config(
         unique_key=['carrier', 'effective_date', 'expiry_date', 'md_source_file'],
         merge_update_columns=[
-            'base_rate', 'fuel_surcharge_pct', 'md_source_name', 'md_run_id'
+            'base_rate', 'fuel_surcharge_pct', 'md_source_name', 'md_run_id', 'md_updated_at'
         ]
     )
 }}
