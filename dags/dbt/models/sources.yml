@@ -15,6 +15,8 @@ sources:
         description: Cleaned DHL invoice data from Silver 1
       - name: staging_ups_carrier_report
         description: Cleaned UPS invoice data from Silver 1
+      - name: staging_fedex_rate_card
+        description: Cleaned FedEx rate card data from Silver 1
 
       # ── Silver 2 combined tables (built by dbt) ──
       - name: carrier_invoice

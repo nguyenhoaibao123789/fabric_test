@@ -14,3 +14,18 @@ models:
           - not_null
           - accepted_values:
               values: ['fedex', 'dhl', 'ups']
+
+  - name: carrier_rate_card
+    description: >
+      Unified carrier rate card — maps each carrier's staging rate card to a
+      canonical schema and UNIONs them. One row per carrier/effective_date/expiry_date.
+    columns:
+      - name: carrier
+        tests:
+          - not_null
+      - name: effective_date
+        tests:
+          - not_null
+      - name: base_rate
+        tests:
+          - not_null
