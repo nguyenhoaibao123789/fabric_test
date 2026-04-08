@@ -215,6 +215,7 @@ def create_medallion_dag(subject: dict):
                     "  \"${DBT_VENV}/bin/pip\" install dbt-fabric\n"
                     "fi\n"
                     "cd \"${DBT_PROJECT_DIR}\"\n"
+                    "\"${DBT_VENV}/bin/python\" -c \"import pyodbc; print('pyodbc ok')\"\n"
                     f"\"${{DBT_VENV}}/bin/dbt\" run --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}\n"
                     f"\"${{DBT_VENV}}/bin/dbt\" test --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}"
                 ),
