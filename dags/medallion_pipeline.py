@@ -208,13 +208,14 @@ def create_medallion_dag(subject: dict):
             silver2 = BashOperator(
                 task_id=f"sil1_to_sil2__{entity}",
                 bash_command=(
-                    "set -e && "
-                    "DBT_VENV=/tmp/dbt_venv && "
-                    "[ -x \"${DBT_VENV}/bin/dbt\" ] || "
-                    "  (python -m venv \"${DBT_VENV}\" && "
-                    "   \"${DBT_VENV}/bin/pip\" install dbt-fabric --quiet) && "
-                    "cd \"${DBT_PROJECT_DIR}\" && "
-                    f"\"${{DBT_VENV}}/bin/dbt\" run  --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model} && "
+                    "set -e\n"
+                    "DBT_VENV=/tmp/dbt_venv\n"
+                    "if [ ! -x \"${DBT_VENV}/bin/dbt\" ]; then\n"
+                    "  python -m venv \"${DBT_VENV}\"\n"
+                    "  \"${DBT_VENV}/bin/pip\" install dbt-fabric\n"
+                    "fi\n"
+                    "cd \"${DBT_PROJECT_DIR}\"\n"
+                    f"\"${{DBT_VENV}}/bin/dbt\" run --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}\n"
                     f"\"${{DBT_VENV}}/bin/dbt\" test --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}"
                 ),
                 env={
