@@ -215,7 +215,6 @@ def create_medallion_dag(subject: dict):
                     "   \"${DBT_VENV}/bin/pip\" install dbt-fabric --quiet) && "
                     "\"${DBT_VENV}/bin/dbt\" --version || true && "
                     "cd \"${DBT_PROJECT_DIR}\" && "
-                    "\"${DBT_VENV}/bin/dbt\" deps --profiles-dir . && "
                     f"\"${{DBT_VENV}}/bin/dbt\" run  --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model} && "
                     f"\"${{DBT_VENV}}/bin/dbt\" test --profiles-dir . --target \"${{DBT_TARGET}}\" --select {dbt_model}"
                 ),
