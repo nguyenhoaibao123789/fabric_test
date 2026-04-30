@@ -1,0 +1,163 @@
+{
+    "name": "silver2gold_process_object",
+    "objectId": "1d82cb6e-ba67-4b32-a93f-5f9759ebfd37",
+    "properties": {
+        "activities": [
+            {
+                "name": "Filter Tables by Sequence Number",
+                "type": "Filter",
+                "dependsOn": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@pipeline().parameters.table_config",
+                        "type": "Expression"
+                    },
+                    "condition": {
+                        "value": "@equals(item().sequence_number, pipeline().parameters.sequence_number)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Process Each Table",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Filter Tables by Sequence Number",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Filter Tables by Sequence Number').output.value",
+                        "type": "Expression"
+                    },
+                    "activities": [
+                        {
+                            "name": "Call to main proc",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "typeProperties": {
+                                "storedProcedureName": "[mdf_platform_orchestration].[update_load_status]",
+                                "storedProcedureParameters": {
+                                    "table_id": {
+                                        "value": {
+                                            "value": "@item().table_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "layer": {
+                                        "value": {
+                                            "value": "@item().layer",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_name": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_name",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_run_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_run_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_trigger_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_trigger_time": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_time",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_trigger_type": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_type",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "last_ingest_partition": {
+                                        "value": {
+                                            "value": "@{formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')}",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedService": {
+                                "name": "MDF_WAREHOUSE_DEV_001",
+                                "properties": {
+                                    "annotations": [],
+                                    "type": "DataWarehouse",
+                                    "typeProperties": {
+                                        "endpoint": "nv3l45p7irxunojdrwsud5otge-isco3hrff5zuzpeqnjwvvo6u5i.datawarehouse.fabric.microsoft.com",
+                                        "artifactId": "c3761e0c-3b74-4d36-8fe6-69d703178d65",
+                                        "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id": {
+                "type": "string"
+            },
+            "pipeline_name": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_time": {
+                "type": "string"
+            },
+            "pipeline_trigger_type": {
+                "type": "string"
+            },
+            "table_config": {
+                "type": "array"
+            },
+            "sequence_number": {
+                "type": "int"
+            }
+        },
+        "lastModifiedByObjectId": "9bf2ac9e-1d69-4d64-8784-ed0fdebe0b26",
+        "lastPublishTime": "2025-09-29T03:29:24Z"
+    }
+}

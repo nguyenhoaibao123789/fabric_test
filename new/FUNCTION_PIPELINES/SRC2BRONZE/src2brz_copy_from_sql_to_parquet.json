@@ -1,0 +1,117 @@
+{
+    "name": "src2brz_copy_from_sql_to_parquet",
+    "objectId": "b73f37a4-71ac-4cff-8b17-0a8eaf200a41",
+    "properties": {
+        "activities": [
+            {
+                "name": "Copy data1",
+                "type": "Copy",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "SqlServerSource",
+                        "sqlReaderQuery": {
+                            "value": "SELECT * \nFROM [@{pipeline().parameters.table_detail.sourceschemaname}].[@{pipeline().parameters.table_detail.tablename}]\n",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None",
+                        "datasetSettings": {
+                            "annotations": [],
+                            "type": "SqlServerTable",
+                            "schema": [],
+                            "typeProperties": {
+                                "database": "master"
+                            },
+                            "externalReferences": {
+                                "connection": "47812b0d-5b1f-463e-b2ac-1d3f66c1a40d"
+                            }
+                        }
+                    },
+                    "sink": {
+                        "type": "ParquetSink",
+                        "storeSettings": {
+                            "type": "AzureBlobStorageWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "ParquetWriteSettings",
+                            "enableVertiParquet": true
+                        },
+                        "datasetSettings": {
+                            "annotations": [],
+                            "linkedService": {
+                                "name": "fabric_test_datalake",
+                                "properties": {
+                                    "annotations": [],
+                                    "type": "Lakehouse",
+                                    "typeProperties": {
+                                        "workspaceId": "d81eba7e-0f95-4721-a677-914b6cc88bb5",
+                                        "artifactId": "4c52bb76-5e1a-4bf6-9db1-23dae816346b",
+                                        "rootFolder": "Files"
+                                    }
+                                }
+                            },
+                            "type": "Parquet",
+                            "typeProperties": {
+                                "location": {
+                                    "type": "LakehouseLocation",
+                                    "fileName": {
+                                        "value": "@{pipeline().parameters.table_detail.sourcetablename}.parquet",
+                                        "type": "Expression"
+                                    },
+                                    "folderPath": {
+                                        "value": "@{pipeline().parameters.table_detail.container}\n  /@{pipeline().parameters.table_detail.datasubject}\n  /@{pipeline().parameters.table_detail.classification}\n  /@{pipeline().parameters.table_detail.sourcesystem}\n  /@{pipeline().parameters.table_detail.sourceschema}\n  /@{pipeline().parameters.table_detail.tablename}\n  /@{pipeline().parameters.table_detail.ingest_channel}\n  /@{formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH-mm-ss')}\n",
+                                        "type": "Expression"
+                                    }
+                                },
+                                "compressionCodec": "snappy"
+                            },
+                            "schema": []
+                        }
+                    },
+                    "enableStaging": false,
+                    "translator": {
+                        "type": "TabularTranslator",
+                        "typeConversion": true,
+                        "typeConversionSettings": {
+                            "allowDataTruncation": true,
+                            "treatBooleanAsNumber": false
+                        }
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id": {
+                "type": "string"
+            },
+            "pipeline_name": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_time": {
+                "type": "string"
+            },
+            "pipeline_trigger_type": {
+                "type": "string"
+            },
+            "table_detail": {
+                "type": "object"
+            }
+        },
+        "lastModifiedByObjectId": "a1c35b63-faa1-4b34-b2a1-c3dd5afd11f3",
+        "lastPublishTime": "2026-04-21T08:58:13Z"
+    }
+}

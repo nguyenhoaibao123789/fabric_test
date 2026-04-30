@@ -1,0 +1,529 @@
+{
+    "name": "bronze2silver_refresh_warehouse_table",
+    "objectId": "73f385fb-ca35-4677-b89b-253e7345bbad",
+    "properties": {
+        "activities": [
+            {
+                "name": "Get List Partitions",
+                "type": "GetMetadata",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "fieldList": [
+                        "childItems"
+                    ],
+                    "datasetSettings": {
+                        "annotations": [],
+                        "linkedService": {
+                            "name": "MDF_LAKEHOUSE_DEV_001",
+                            "properties": {
+                                "annotations": [],
+                                "type": "Lakehouse",
+                                "typeProperties": {
+                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                    "artifactId": "e638c447-1201-4ad5-b5c0-b51f406ec2ec",
+                                    "rootFolder": "Files"
+                                }
+                            }
+                        },
+                        "type": "Binary",
+                        "typeProperties": {
+                            "location": {
+                                "type": "LakehouseLocation",
+                                "folderPath": {
+                                    "value": "bronze/@{pipeline().parameters.datasubject}/@{pipeline().parameters.classification}/@{pipeline().parameters.sourcesystem}/@{pipeline().parameters.sourceschema}/@{pipeline().parameters.tablename}/@{pipeline().parameters.ingest_channel}",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    },
+                    "storeSettings": {
+                        "type": "LakehouseReadSettings",
+                        "recursive": true,
+                        "enablePartitionDiscovery": false
+                    },
+                    "formatSettings": {
+                        "type": "BinaryReadSettings"
+                    }
+                }
+            },
+            {
+                "name": "Filter Last Partitions",
+                "type": "Filter",
+                "dependsOn": [
+                    {
+                        "activity": "Get List Partitions",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Get List Partitions').output.childItems",
+                        "type": "Expression"
+                    },
+                    "condition": {
+                        "value": "@greater(replace(item().name,'ingest_partition=',''),pipeline().parameters.ingest_partition)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Sorting list of Partitions",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "Filter Last Partitions",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "DataWarehouseSource",
+                        "sqlReaderQuery": {
+                            "value": "DECLARE @JSON nvarchar(max) = N'@{activity('Filter Last Partitions').output.Value}';\n\nSELECT [name]\nFROM OPENJSON(@JSON)\nWITH (\n  [name] varchar(200) '$.name',\n  [type] varchar(50)  '$.type'\n)\nORDER BY [name] ASC;",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "firstRowOnly": false,
+                    "datasetSettings": {
+                        "annotations": [],
+                        "linkedService": {
+                            "name": "MDF_WAREHOUSE_DEV_001",
+                            "properties": {
+                                "annotations": [],
+                                "type": "DataWarehouse",
+                                "typeProperties": {
+                                    "endpoint": "nv3l45p7irxunojdrwsud5otge-isco3hrff5zuzpeqnjwvvo6u5i.datawarehouse.fabric.microsoft.com",
+                                    "artifactId": "c3761e0c-3b74-4d36-8fe6-69d703178d65",
+                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                }
+                            }
+                        },
+                        "type": "DataWarehouseTable",
+                        "schema": []
+                    }
+                }
+            },
+            {
+                "name": "Process each partitions",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Sorting list of Partitions",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Sorting list of Partitions').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "Call to bronze2silver_transform_nbk",
+                            "type": "TridentNotebook",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "typeProperties": {
+                                "notebookId": "00000000-0000-0000-0000-000000000002",
+                                "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                "parameters": {
+                                    "pipeline_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "pipeline_name": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_name",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "pipeline_run_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_run_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "pipeline_trigger_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "pipeline_trigger_time": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_time",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "pipeline_trigger_type": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_type",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "container": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.container",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "datasubject": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.datasubject",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "classification": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.classification",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "sourcesystem": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.sourcesystem",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "sourceschema": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.sourceschema",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "sourceschemaname": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.sourceschemaname",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "sourcetablename": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.sourcetablename",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "tablename": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.tablename",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "table_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.table_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "ingest_channel": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.ingest_channel",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "ingest_partition": {
+                                        "value": {
+                                            "value": "@item().name",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "file_type": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.file_type",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "criteria_columns": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.criteria_columns",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "full_refresh_flag": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.full_refresh_flag",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Call to bronze2silver_dq_nbk",
+                            "type": "TridentNotebook",
+                            "dependsOn": [
+                                {
+                                    "activity": "Call to bronze2silver_transform_nbk",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "typeProperties": {
+                                "notebookId": "00000000-0000-0000-0000-000000000003",
+                                "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                "parameters": {
+                                    "table_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.table_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "tablename": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.tablename",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "pipeline_run_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_run_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    },
+                                    "pipeline_trigger_time": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_time",
+                                            "type": "Expression"
+                                        },
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Load Status",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "Call to bronze2silver_transform_nbk",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "typeProperties": {
+                                "storedProcedureName": "[mdf_platform_orchestration].[update_load_status]",
+                                "storedProcedureParameters": {
+                                    "last_ingest_partition": {
+                                        "value": {
+                                            "value": "@item().name",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "layer": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.layer",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_name": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_name",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_run_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_run_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_trigger_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_trigger_time": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_time",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "pipeline_trigger_type": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.pipeline_trigger_type",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "table_id": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.table_id",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedService": {
+                                "name": "MDF_WAREHOUSE_DEV_001",
+                                "properties": {
+                                    "annotations": [],
+                                    "type": "DataWarehouse",
+                                    "typeProperties": {
+                                        "endpoint": "nv3l45p7irxunojdrwsud5otge-isco3hrff5zuzpeqnjwvvo6u5i.datawarehouse.fabric.microsoft.com",
+                                        "artifactId": "c3761e0c-3b74-4d36-8fe6-69d703178d65",
+                                        "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id": {
+                "type": "string"
+            },
+            "pipeline_name": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_time": {
+                "type": "string"
+            },
+            "pipeline_trigger_type": {
+                "type": "string"
+            },
+            "container": {
+                "type": "string"
+            },
+            "datasubject": {
+                "type": "string"
+            },
+            "classification": {
+                "type": "string"
+            },
+            "sourcesystem": {
+                "type": "string"
+            },
+            "sourceschema": {
+                "type": "string"
+            },
+            "sourceschemaname": {
+                "type": "string"
+            },
+            "sourcetablename": {
+                "type": "string"
+            },
+            "tablename": {
+                "type": "string"
+            },
+            "table_id": {
+                "type": "string"
+            },
+            "ingest_channel": {
+                "type": "string"
+            },
+            "latest_load_dt": {
+                "type": "string"
+            },
+            "ingest_partition": {
+                "type": "string"
+            },
+            "criteria_columns": {
+                "type": "string"
+            },
+            "full_refresh_flag": {
+                "type": "string"
+            },
+            "layer": {
+                "type": "string"
+            },
+            "file_type": {
+                "type": "string"
+            }
+        },
+        "lastModifiedByObjectId": "9bf2ac9e-1d69-4d64-8784-ed0fdebe0b26",
+        "lastPublishTime": "2025-09-29T03:23:16Z"
+    }
+}

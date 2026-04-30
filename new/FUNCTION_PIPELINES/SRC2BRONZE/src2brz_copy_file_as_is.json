@@ -1,0 +1,304 @@
+{
+    "name": "src2brz_copy_file_as_is",
+    "objectId": "00000000-0000-0000-0000-000000000001",
+    "properties": {
+        "activities": [
+            {
+                "name": "Copy File to Bronze",
+                "type": "Copy",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "BinarySource",
+                        "storeSettings": {
+                            "type": "SharePointOnlineReadSettings",
+                            "recursive": false,
+                            "wildcardFileName": {
+                                "value": "@pipeline().parameters.file_pattern",
+                                "type": "Expression"
+                            },
+                            "deleteFilesAfterCompletion": false
+                        },
+                        "formatSettings": {
+                            "type": "BinaryReadSettings"
+                        }
+                    },
+                    "sink": {
+                        "type": "BinarySink",
+                        "storeSettings": {
+                            "type": "LakehouseWriteSettings"
+                        }
+                    },
+                    "enableStaging": false
+                },
+                "inputs": [
+                    {
+                        "referenceName": "BinaryDataset_Source",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "folderPath": {
+                                "value": "@pipeline().parameters.custom_source_path",
+                                "type": "Expression"
+                            },
+                            "fileName": {
+                                "value": "@pipeline().parameters.file_pattern",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "BinaryDataset_Bronze",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "folderPath": {
+                                "value": "bronze/@{pipeline().parameters.datasubject}/@{pipeline().parameters.classification}/@{pipeline().parameters.sourcesystem}/@{pipeline().parameters.sourceschema}/@{pipeline().parameters.tablename}/@{pipeline().parameters.ingest_channel}/@{formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')}",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ],
+                "datasetSettings": {
+                    "source": {
+                        "annotations": [],
+                        "linkedService": {
+                            "name": "MDF_SHAREPOINT_DEV_001",
+                            "properties": {
+                                "annotations": [],
+                                "type": "SharePointOnline",
+                                "typeProperties": {
+                                    "siteUrl": {
+                                        "value": "@pipeline().parameters.custom_source_path",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        "type": "Binary",
+                        "typeProperties": {
+                            "location": {
+                                "type": "SharePointOnlineLocation",
+                                "folderPath": {
+                                    "value": "@pipeline().parameters.custom_source_path",
+                                    "type": "Expression"
+                                },
+                                "fileName": {
+                                    "value": "@pipeline().parameters.file_pattern",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    },
+                    "sink": {
+                        "annotations": [],
+                        "linkedService": {
+                            "name": "MDF_LAKEHOUSE_DEV_001",
+                            "properties": {
+                                "annotations": [],
+                                "type": "Lakehouse",
+                                "typeProperties": {
+                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                    "artifactId": "e638c447-1201-4ad5-b5c0-b51f406ec2ec",
+                                    "rootFolder": "Files"
+                                }
+                            }
+                        },
+                        "type": "Binary",
+                        "typeProperties": {
+                            "location": {
+                                "type": "LakehouseLocation",
+                                "folderPath": {
+                                    "value": "bronze/@{pipeline().parameters.datasubject}/@{pipeline().parameters.classification}/@{pipeline().parameters.sourcesystem}/@{pipeline().parameters.sourceschema}/@{pipeline().parameters.tablename}/@{pipeline().parameters.ingest_channel}/@{formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')}",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "name": "Update Load Status",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Copy File to Bronze",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "storedProcedureName": "[mdf_platform_orchestration].[update_load_status]",
+                    "storedProcedureParameters": {
+                        "last_ingest_partition": {
+                            "value": {
+                                "value": "@formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "layer": {
+                            "value": {
+                                "value": "@pipeline().parameters.layer",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "pipeline_id": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_id",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "pipeline_name": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_name",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "pipeline_run_id": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_run_id",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "pipeline_trigger_id": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_trigger_id",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "pipeline_trigger_time": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_trigger_time",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "pipeline_trigger_type": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_trigger_type",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "table_id": {
+                            "value": {
+                                "value": "@pipeline().parameters.table_id",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedService": {
+                    "name": "MDF_WAREHOUSE_DEV_001",
+                    "properties": {
+                        "annotations": [],
+                        "type": "DataWarehouse",
+                        "typeProperties": {
+                            "endpoint": "nv3l45p7irxunojdrwsud5otge-isco3hrff5zuzpeqnjwvvo6u5i.datawarehouse.fabric.microsoft.com",
+                            "artifactId": "c3761e0c-3b74-4d36-8fe6-69d703178d65",
+                            "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                        }
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id": {
+                "type": "string"
+            },
+            "pipeline_name": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_time": {
+                "type": "string"
+            },
+            "pipeline_trigger_type": {
+                "type": "string"
+            },
+            "container": {
+                "type": "string"
+            },
+            "datasubject": {
+                "type": "string"
+            },
+            "classification": {
+                "type": "string"
+            },
+            "sourcesystem": {
+                "type": "string"
+            },
+            "sourceschema": {
+                "type": "string"
+            },
+            "sourceschemaname": {
+                "type": "string"
+            },
+            "sourcetablename": {
+                "type": "string"
+            },
+            "tablename": {
+                "type": "string"
+            },
+            "table_id": {
+                "type": "string"
+            },
+            "ingest_channel": {
+                "type": "string"
+            },
+            "latest_load_dt": {
+                "type": "string"
+            },
+            "ingest_partition": {
+                "type": "string"
+            },
+            "criteria_columns": {
+                "type": "string"
+            },
+            "full_refresh_flag": {
+                "type": "string"
+            },
+            "layer": {
+                "type": "string"
+            },
+            "custom_source_path": {
+                "type": "string"
+            },
+            "file_type": {
+                "type": "string"
+            },
+            "file_pattern": {
+                "type": "string"
+            }
+        },
+        "lastModifiedByObjectId": "9bf2ac9e-1d69-4d64-8784-ed0fdebe0b26",
+        "lastPublishTime": "2025-09-29T00:00:00Z"
+    }
+}

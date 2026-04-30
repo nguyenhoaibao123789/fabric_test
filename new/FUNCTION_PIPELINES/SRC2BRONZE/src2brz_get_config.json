@@ -1,0 +1,202 @@
+{
+    "name": "src2brz_get_config",
+    "objectId": "e8c2ab58-4074-4a96-8ce6-c01f6fd64e2f",
+    "properties": {
+        "activities": [
+            {
+                "name": "Lookup number sequence",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "DataWarehouseSource",
+                        "sqlReaderQuery": {
+                            "value": "SELECT [sequence_number]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE [layer]      = '@{split(pipeline().parameters.pipeline_name,'_')[0]}'\nAND   [datasubject] = '@{split(pipeline().parameters.pipeline_name,'_')[1]}'\nGROUP BY [sequence_number]\nORDER BY [sequence_number]",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "firstRowOnly": false,
+                    "datasetSettings": {
+                        "annotations": [],
+                        "linkedService": {
+                            "name": "fabric_test_warehouse",
+                            "properties": {
+                                "annotations": [],
+                                "type": "DataWarehouse",
+                                "typeProperties": {
+                                    "endpoint": "nv3l45p7irxunojdrwsud5otge-p25b5wevb4qupjtxsffwzselwu.datawarehouse.fabric.microsoft.com",
+                                    "artifactId": "871d7b1e-7242-4ce0-9907-bbbf85563694",
+                                    "workspaceId": "d81eba7e-0f95-4721-a677-914b6cc88bb5"
+                                }
+                            }
+                        },
+                        "type": "DataWarehouseTable",
+                        "schema": [],
+                        "typeProperties": {
+                            "schema": "queryinsights",
+                            "table": "exec_requests_history"
+                        }
+                    }
+                }
+            },
+            {
+                "name": "ForEach1",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup number sequence",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    },
+                    {
+                        "activity": "Lookup table config",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup number sequence').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "Invoke process object",
+                            "type": "InvokePipeline",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "typeProperties": {
+                                "waitOnCompletion": true,
+                                "operationType": "InvokeFabricPipeline",
+                                "pipelineId": "0597c47f-5de3-4c78-9442-ae5ba5bb2306",
+                                "workspaceId": "d81eba7e-0f95-4721-a677-914b6cc88bb5",
+                                "parameters": {
+                                    "pipeline_id": {
+                                        "value": "@pipeline().parameters.pipeline_id",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_name": {
+                                        "value": "@pipeline().parameters.pipeline_name",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_run_id": {
+                                        "value": "@pipeline().parameters.pipeline_run_id",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_trigger_id": {
+                                        "value": "@pipeline().parameters.pipeline_trigger_id",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_trigger_time": {
+                                        "value": "@pipeline().parameters.pipeline_trigger_time",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_trigger_type": {
+                                        "value": "@pipeline().parameters.pipeline_trigger_type",
+                                        "type": "Expression"
+                                    },
+                                    "table_config": {
+                                        "value": "@activity('Lookup table config').output.value",
+                                        "type": "Expression"
+                                    },
+                                    "sequence_number": {
+                                        "value": "@item().sequence_number",
+                                        "type": "Expression"
+                                    }
+                                }
+                            },
+                            "externalReferences": {
+                                "connection": "4c68d8f5-4533-4d83-a35e-b5817979f2d2"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Lookup table config",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "DataWarehouseSource",
+                        "sqlReaderQuery": {
+                            "value": "SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[bronze_file_type]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer] = '@{split(pipeline().parameters.pipeline_name, '_')[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, '_')[1]}'",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "firstRowOnly": false,
+                    "datasetSettings": {
+                        "annotations": [],
+                        "linkedService": {
+                            "name": "fabric_test_warehouse",
+                            "properties": {
+                                "annotations": [],
+                                "type": "DataWarehouse",
+                                "typeProperties": {
+                                    "endpoint": "nv3l45p7irxunojdrwsud5otge-p25b5wevb4qupjtxsffwzselwu.datawarehouse.fabric.microsoft.com",
+                                    "artifactId": "871d7b1e-7242-4ce0-9907-bbbf85563694",
+                                    "workspaceId": "d81eba7e-0f95-4721-a677-914b6cc88bb5"
+                                }
+                            }
+                        },
+                        "type": "DataWarehouseTable",
+                        "schema": [],
+                        "typeProperties": {
+                            "schema": "queryinsights",
+                            "table": "exec_requests_history"
+                        }
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id": {
+                "type": "string"
+            },
+            "pipeline_name": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_time": {
+                "type": "string"
+            },
+            "pipeline_trigger_type": {
+                "type": "string"
+            }
+        },
+        "lastModifiedByObjectId": "a1c35b63-faa1-4b34-b2a1-c3dd5afd11f3",
+        "lastPublishTime": "2026-04-21T09:30:45Z"
+    }
+}

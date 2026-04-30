@@ -1,0 +1,2 @@
+table_id,datasubject,classification,sourcesystem,sourceschema,sourceschemaname,sourcetablename,tablename,job_group,ingest_channel,layer,container,sequence_number,cycle,process_id,ref_table_id,bronze_file_format,file_type,bronze_file_type,file_pattern,custom_source_path,custom_table_name,ingest_partition,ref_ingest_partition,last_loaded_dt,criteria_columns,full_refresh_flag
+1,financial,restricted,iccpdatabase,sales,sales,orders,orders,NULL,ingest_channel=dfp,src2brz,bronze,10,daily,0,NULL,parquet_none_header,NULL,parquet,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1

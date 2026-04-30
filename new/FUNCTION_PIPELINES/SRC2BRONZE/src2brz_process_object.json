@@ -1,0 +1,139 @@
+{
+    "name": "src2brz_process_object",
+    "objectId": "0597c47f-5de3-4c78-9442-ae5ba5bb2306",
+    "properties": {
+        "activities": [
+            {
+                "name": "Get list of table name",
+                "description": "Get list table name based on current sequence number",
+                "type": "Filter",
+                "dependsOn": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@pipeline().parameters.table_config",
+                        "type": "Expression"
+                    },
+                    "condition": {
+                        "value": "@equals(item().sequence_number, pipeline().parameters.sequence_number)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "ForEach table",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Get list of table name",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Get list of table name').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "Switch1",
+                            "type": "Switch",
+                            "dependsOn": [],
+                            "typeProperties": {
+                                "on": {
+                                    "value": "@item().bronze_file_format",
+                                    "type": "Expression"
+                                },
+                                "cases": [
+                                    {
+                                        "value": "parquet_none_header",
+                                        "activities": [
+                                            {
+                                                "name": "Invoke copy from sql to parquet",
+                                                "type": "InvokePipeline",
+                                                "dependsOn": [],
+                                                "policy": {
+                                                    "timeout": "0.12:00:00",
+                                                    "retry": 0,
+                                                    "retryIntervalInSeconds": 30,
+                                                    "secureOutput": false,
+                                                    "secureInput": false
+                                                },
+                                                "typeProperties": {
+                                                    "waitOnCompletion": true,
+                                                    "operationType": "InvokeFabricPipeline",
+                                                    "pipelineId": "b73f37a4-71ac-4cff-8b17-0a8eaf200a41",
+                                                    "workspaceId": "d81eba7e-0f95-4721-a677-914b6cc88bb5"
+                                                },
+                                                "externalReferences": {
+                                                    "connection": "4c68d8f5-4533-4d83-a35e-b5817979f2d2"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "value": "csv",
+                                        "activities": [
+                                            {
+                                                "name": "Wait2",
+                                                "type": "Wait",
+                                                "dependsOn": [],
+                                                "typeProperties": {
+                                                    "waitTimeInSeconds": 1
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "value": "excel",
+                                        "activities": [
+                                            {
+                                                "name": "Wait3",
+                                                "type": "Wait",
+                                                "dependsOn": [],
+                                                "typeProperties": {
+                                                    "waitTimeInSeconds": 1
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "defaultActivities": []
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id": {
+                "type": "string"
+            },
+            "pipeline_name": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_time": {
+                "type": "string"
+            },
+            "pipeline_trigger_type": {
+                "type": "string"
+            },
+            "table_config": {
+                "type": "array"
+            },
+            "sequence_number": {
+                "type": "int"
+            }
+        },
+        "lastModifiedByObjectId": "a1c35b63-faa1-4b34-b2a1-c3dd5afd11f3",
+        "lastPublishTime": "2026-04-21T09:53:57Z"
+    }
+}

@@ -1,0 +1,2580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fabric ELT Pipeline — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font:'IBM Plex Sans',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --bg:#f8f7f4; --bg2:#f0ede8; --bg3:#e8e4de;
+  --tx:#1c1b18; --tx2:#5c5a54; --tx3:#9c9a92;
+  --bd:rgba(0,0,0,.10); --bd2:rgba(0,0,0,.18);
+  --blue:#1565a8;   --blue-bg:#deeefa;  --blue-tx:#0c3f72;
+  --amber:#7a4500;  --amber-bg:#faebd4; --amber-tx:#4d2c00; --amber-str:#b36900;
+  --teal:#0a6647;   --teal-bg:#d6f2e8;  --teal-tx:#073d2a;  --teal-str:#18916a;
+  --purple:#4a40b0; --purple-bg:#eae8fd;--purple-tx:#302880; --purple-str:#7268d4;
+  --gray:#5a5850;   --gray-bg:#ece9e2;  --gray-tx:#3a3830;
+  --green:#35600e;  --green-bg:#e4f2d4; --green-tx:#1e3a08; --green-str:#5c8f1e;
+  --red:#8b1a1a;    --red-bg:#fde8e8;   --red-tx:#5c0f0f;
+  --shadow-sm:0 2px 8px rgba(0,0,0,.07);
+  --shadow:0 4px 24px rgba(0,0,0,.10);
+  --shadow-lg:0 12px 48px rgba(0,0,0,.14);
+  --r:12px; --rsm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;overflow-x:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);font-size:14px}
+
+/* ── NAV ── */
+#nav{position:fixed;top:0;left:0;right:0;z-index:100;height:52px;background:rgba(248,247,244,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;padding:0 36px}
+#nav-logo{font-size:13px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:10px}
+#nav-logo span{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3)}
+#nav-links{display:flex;gap:4px}
+.nl{padding:5px 13px;border-radius:6px;font-size:12px;font-weight:500;color:var(--tx2);cursor:pointer;transition:background .15s,color .15s;border:none;background:transparent;font-family:var(--font);text-decoration:none}
+.nl:hover,.nl.active{background:var(--bg3);color:var(--tx)}
+#nav-badge{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:20px;background:var(--teal-bg);color:var(--teal-tx);border:1px solid rgba(10,102,71,.2)}
+
+/* ── DOTS ── */
+#dots{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:99;display:flex;flex-direction:column;gap:10px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--tx3);opacity:.35;cursor:pointer;transition:opacity .2s,transform .2s,background .2s;border:none}
+.dot:hover{opacity:.7;transform:scale(1.3)}
+.dot.active{opacity:1;background:var(--blue);transform:scale(1.25)}
+
+/* ── SECTION BASE ── */
+section{min-height:100vh;padding:88px 64px 64px;display:flex;flex-direction:column;justify-content:center;position:relative}
+.s-eyebrow{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);margin-bottom:12px}
+.s-title{font-size:42px;font-weight:700;letter-spacing:-.8px;line-height:1.15;color:var(--tx);margin-bottom:16px;max-width:820px}
+.s-title em{font-style:normal;color:var(--teal-str)}
+.s-sub{font-size:17px;font-weight:400;color:var(--tx2);line-height:1.65;max-width:680px;margin-bottom:40px}
+.s-section-num{position:absolute;bottom:36px;right:64px;font-size:72px;font-weight:700;color:var(--bd2);font-family:var(--mono);letter-spacing:-2px;pointer-events:none;user-select:none}
+
+/* ── S1 COVER ── */
+#s1{background:linear-gradient(135deg,#e8f5ee 0%,var(--bg) 50%,#e8f0ff 100%)}
+#s1 .s-title{font-size:52px}
+.cover-stats{display:flex;gap:28px;flex-wrap:wrap;margin-top:8px}
+.stat-card{padding:20px 28px;border-radius:var(--r);border:1.5px solid var(--bd2);background:rgba(255,255,255,.6);backdrop-filter:blur(4px);text-align:center;min-width:140px}
+.stat-num{font-size:36px;font-weight:700;letter-spacing:-1px;line-height:1}
+.stat-num.blue{color:var(--blue)} .stat-num.teal{color:var(--teal-str)}
+.stat-num.amber{color:var(--amber-str)} .stat-num.purple{color:var(--purple-str)}
+.stat-label{font-size:11px;color:var(--tx3);font-weight:600;letter-spacing:.04em;margin-top:5px;text-transform:uppercase}
+.cover-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:20px;background:var(--teal-bg);color:var(--teal-tx);border:1.5px solid rgba(10,102,71,.3);font-size:12px;font-weight:600;margin-top:36px}
+
+/* ── MEDALLION ── */
+#s2{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%)}
+.medallion-flow{display:flex;align-items:stretch;gap:0;max-width:1050px;margin-top:8px}
+.medal-card{flex:1;padding:28px 20px;border-radius:var(--r);border:2px solid;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.medal-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.medal-card.bronze{background:#fdf3e7;border-color:#c97a2a;color:#6b3e10}
+.medal-card.silver{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-tx)}
+.medal-card.gold{background:#fef9e0;border-color:#c9a200;color:#6b5000}
+.medal-card.platinum{background:var(--purple-bg);border-color:var(--purple);color:var(--purple-tx)}
+.medal-layer{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.65;margin-bottom:8px}
+.medal-name{font-size:20px;font-weight:700;letter-spacing:-.3px;margin-bottom:8px;font-family:var(--mono)}
+.medal-desc{font-size:11px;line-height:1.65;opacity:.85;margin-bottom:14px}
+.medal-items{display:flex;flex-direction:column;gap:4px}
+.medal-item{font-size:11px;display:flex;align-items:flex-start;gap:6px;opacity:.85}
+.mi-dot{width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0;margin-top:4px;opacity:.6}
+.medal-wm{position:absolute;bottom:-8px;right:10px;font-size:80px;font-weight:700;opacity:.04;font-family:var(--mono);pointer-events:none}
+.medal-arrow{width:40px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:22px;padding-bottom:20px}
+
+/* ── PIPELINE FLOW ── */
+#s3{background:var(--bg2)}
+.flow-outer{overflow-x:auto;padding-bottom:12px;margin-top:4px}
+.flow-wrap{position:relative;width:1300px;height:400px;flex-shrink:0}
+.fn{
+  position:absolute;border-radius:var(--rsm);
+  display:flex;flex-direction:column;justify-content:center;padding:8px 10px;
+  font-size:11px;font-weight:600;line-height:1.35;
+  border:1.5px solid var(--bd2);background:white;
+  transition:box-shadow .2s, border-color .2s, background .2s, transform .15s;
+  cursor:pointer;box-shadow:var(--shadow-sm);
+}
+.fn:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.fn sub{font-size:9px;font-weight:400;color:var(--tx3);display:block;margin-top:2px}
+.fn.app-node{background:var(--bg2);border-style:dashed}
+.fn.blue{border-color:rgba(21,101,168,.3)}
+.fn.teal{border-color:rgba(10,102,71,.3)}
+.fn.amber{border-color:rgba(185,105,0,.3)}
+.fn.purple{border-color:rgba(74,64,176,.3)}
+.fn.gray{border-color:var(--bd2);opacity:.55}
+.fn.hl-db{background:var(--amber-bg)!important;border-color:var(--amber-str)!important;border-width:2px!important;box-shadow:0 0 0 3px rgba(179,105,0,.15)!important;z-index:10}
+.fn.hl-file{background:var(--teal-bg)!important;border-color:var(--teal-str)!important;border-width:2px!important;box-shadow:0 0 0 3px rgba(24,145,106,.15)!important;z-index:10}
+.fn.hl-sp{background:var(--green-bg)!important;border-color:var(--green-str)!important;border-width:2px!important;box-shadow:0 0 0 3px rgba(92,143,30,.15)!important;z-index:10}
+.fn.hl-b2s{background:var(--blue-bg)!important;border-color:var(--blue)!important;border-width:2px!important;box-shadow:0 0 0 3px rgba(21,101,168,.15)!important;z-index:10}
+.fn.hl-sil{background:var(--purple-bg)!important;border-color:var(--purple)!important;border-width:2px!important;box-shadow:0 0 0 3px rgba(74,64,176,.15)!important;z-index:10}
+.flow-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.fp{fill:none;stroke:#c8c5be;stroke-width:1.5;transition:stroke .2s,stroke-width .2s,opacity .2s;marker-end:url(#arr-gray)}
+.fp.hl-db{stroke:var(--amber-str)!important;stroke-width:2.5!important;marker-end:url(#arr-db)!important}
+.fp.hl-file{stroke:var(--teal-str)!important;stroke-width:2.5!important;marker-end:url(#arr-file)!important}
+.fp.hl-sp{stroke:var(--green-str)!important;stroke-width:2.5!important;marker-end:url(#arr-sp)!important}
+.fp.hl-b2s{stroke:var(--blue)!important;stroke-width:2.5!important;marker-end:url(#arr-b2s)!important}
+.fp.hl-sil{stroke:var(--purple-str)!important;stroke-width:2.5!important;marker-end:url(#arr-sil)!important}
+.fp.dim{opacity:.15}
+.route-btns{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.rb{display:inline-flex;align-items:center;gap:7px;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all .15s;font-family:var(--font)}
+.rb.none{background:white;border-color:var(--bd2);color:var(--tx2)} .rb.none:hover{background:var(--bg3);color:var(--tx)}
+.rb.db{background:var(--amber-bg);border-color:var(--amber-str);color:var(--amber-tx)}
+.rb.file{background:var(--teal-bg);border-color:var(--teal-str);color:var(--teal-tx)}
+.rb.sp{background:var(--green-bg);border-color:var(--green-str);color:var(--green-tx)}
+.rb.b2s{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-tx)}
+.rb.sil{background:var(--purple-bg);border-color:var(--purple-str);color:var(--purple-tx)}
+.rb.active{transform:scale(1.04);box-shadow:var(--shadow-sm)}
+.rb-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* ── TOOLTIP ── */
+#tooltip{
+  position:fixed;z-index:500;
+  background:white;border:1.5px solid var(--bd2);
+  border-radius:var(--r);padding:16px 18px;
+  box-shadow:var(--shadow-lg);width:280px;
+  pointer-events:none;
+  opacity:0;transform:translateY(6px) scale(.97);
+  transition:opacity .15s,transform .15s;
+}
+#tooltip.visible{opacity:1;transform:translateY(0) scale(1)}
+.tt-type{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:10px;display:inline-block;margin-bottom:10px}
+.tt-type.blue{background:var(--blue-bg);color:var(--blue-tx)}
+.tt-type.teal{background:var(--teal-bg);color:var(--teal-tx)}
+.tt-type.amber{background:var(--amber-bg);color:var(--amber-tx)}
+.tt-type.purple{background:var(--purple-bg);color:var(--purple-tx)}
+.tt-type.gray{background:var(--gray-bg);color:var(--gray-tx)}
+.tt-title{font-size:13px;font-weight:700;letter-spacing:-.1px;margin-bottom:6px;font-family:var(--mono)}
+.tt-body{font-size:11px;color:var(--tx2);line-height:1.65;margin-bottom:10px}
+.tt-acts{display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--bd);padding-top:10px}
+.tt-act{font-size:10px;color:var(--tx2);display:flex;align-items:flex-start;gap:6px;line-height:1.5}
+.tt-act-icon{color:var(--tx3);flex-shrink:0;margin-top:1px;font-style:normal}
+
+/* ── NODE MODAL ── */
+#node-modal{position:fixed;inset:0;z-index:200;background:rgba(28,27,24,.52);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .2s}
+#node-modal.open{opacity:1;pointer-events:all}
+#modal-card{width:min(980px,100%);max-height:calc(100vh - 80px);border-radius:var(--r);background:white;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;transform:translateY(18px) scale(.98);transition:transform .25s;overflow:hidden}
+#node-modal.open #modal-card{transform:none}
+#modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--bg2);border-bottom:1.5px solid var(--bd2);flex-shrink:0;gap:12px}
+#modal-head-left{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+#modal-title{font-family:var(--mono);font-size:14px;font-weight:700;word-break:break-all}
+#modal-file{font-size:10px;font-weight:600;letter-spacing:.05em;color:var(--tx3);background:var(--bg3);padding:2px 8px;border-radius:10px;white-space:nowrap}
+#modal-close{background:none;border:none;cursor:pointer;color:var(--tx3);font-size:20px;padding:0 2px;line-height:1;flex-shrink:0}
+#modal-close:hover{color:var(--tx)}
+#modal-body{display:grid;grid-template-columns:1.6fr 1fr;overflow:hidden;flex:1}
+#modal-acts{padding:20px 22px;overflow-y:auto;border-right:1px solid var(--bd)}
+#modal-params{padding:20px 22px;overflow-y:auto}
+.mc-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-bottom:12px}
+.act-item{margin-bottom:10px;background:var(--bg2);border-radius:var(--rsm);border:1px solid var(--bd);padding:10px 12px}
+.act-badge{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:8px;display:inline-block;margin-bottom:5px}
+.act-badge.blue{background:var(--blue-bg);color:var(--blue-tx)} .act-badge.teal{background:var(--teal-bg);color:var(--teal-tx)} .act-badge.amber{background:var(--amber-bg);color:var(--amber-tx)} .act-badge.purple{background:var(--purple-bg);color:var(--purple-tx)} .act-badge.gray{background:var(--gray-bg);color:var(--gray-tx)} .act-badge.green{background:var(--green-bg);color:var(--green-tx)}
+.act-seq-tag{font-size:9px;font-weight:600;padding:2px 7px;border-radius:8px;display:inline-block;margin-left:5px}
+.act-seq-tag.seq{background:var(--amber-bg);color:var(--amber-tx)} .act-seq-tag.par{background:var(--teal-bg);color:var(--teal-tx)}
+.act-name{font-size:12px;font-weight:700;margin-bottom:6px;line-height:1.35}
+.act-details{display:flex;flex-direction:column;gap:3px}
+.act-detail{font-size:10px;color:var(--tx2);line-height:1.55;margin-bottom:2px}
+.act-dlabel{font-weight:700;color:var(--tx3);font-size:9px;letter-spacing:.04em;text-transform:uppercase;margin-right:4px}
+.act-code{font-family:var(--mono);font-size:9px;line-height:1.7;background:#1c1b18;color:#d4d1ca;padding:7px 10px;border-radius:5px;white-space:pre;overflow-x:auto;display:block;margin-top:3px}
+.act-nested{margin-top:8px;border-left:2px solid var(--bd2);padding-left:10px}
+.act-nested-label{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);margin-bottom:6px}
+.act-owner{font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:8px;display:inline-block;margin-left:4px;vertical-align:middle}
+.act-owner.pipeline{background:var(--blue-bg);color:var(--blue-tx)}
+.act-owner.notebook{background:var(--green-bg);color:var(--green-tx)}
+.acts-legend{display:flex;gap:14px;margin-top:14px;padding-top:10px;border-top:1px solid var(--bd);flex-wrap:wrap}
+.acts-legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--tx2)}
+.param-table{width:100%;border-collapse:collapse}
+.param-table th{padding:5px 10px;text-align:left;background:var(--bg2);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);border-bottom:1px solid var(--bd)}
+.param-table td{padding:6px 10px;border-bottom:1px solid var(--bd);font-size:10px}
+.param-table tr:last-child td{border-bottom:none}
+.param-name{font-family:var(--mono);font-weight:600;color:var(--blue-tx)}
+.param-type-tag{font-size:9px;color:var(--tx3);background:var(--bg3);padding:1px 5px;border-radius:4px;font-family:var(--mono)}
+@media(max-width:700px){#modal-body{grid-template-columns:1fr}#modal-acts{border-right:none;border-bottom:1px solid var(--bd)}}
+
+/* ── src2brz ── */
+#s4{background:var(--bg)}
+.two-path{display:flex;gap:24px;max-width:1100px;align-items:stretch}
+.path-card{flex:1;padding:32px;border-radius:var(--r);border:2px solid;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.path-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.path-card.db{background:var(--amber-bg);border-color:var(--amber-str);color:var(--amber-tx)}
+.path-card.file{background:var(--teal-bg);border-color:var(--teal-str);color:var(--teal-tx)}
+.path-tag{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:20px;background:rgba(0,0,0,.07);display:inline-block;margin-bottom:14px}
+.path-title{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:6px;font-family:var(--mono)}
+.path-desc{font-size:13px;line-height:1.7;opacity:.85;margin-bottom:20px}
+.path-steps{display:flex;flex-direction:column;gap:10px}
+.ps-item{display:flex;align-items:flex-start;gap:10px;font-size:12px;line-height:1.5}
+.ps-num{width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;font-family:var(--mono)}
+.ps-label{font-weight:700;margin-bottom:2px}
+.ps-code{margin-top:4px;padding:4px 8px;border-radius:5px;background:rgba(0,0,0,.06);font-family:var(--mono);font-size:10px;display:inline-block}
+.path-wm{position:absolute;bottom:-8px;right:12px;font-size:88px;font-weight:700;opacity:.04;font-family:var(--mono);pointer-events:none}
+.path-vs{width:48px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--tx3)}
+.path-vs-c{width:36px;height:36px;border-radius:50%;border:2px solid var(--bd2);background:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--tx3)}
+
+/* ── BRONZE2SILVER ── */
+#s5{background:linear-gradient(180deg,var(--bg2) 0%,var(--bg) 100%)}
+.b2s-layout{display:flex;gap:32px;max-width:1100px;align-items:flex-start}
+.b2s-col{flex:1}
+.b2s-card{padding:28px;border-radius:var(--r);background:white;border:1.5px solid var(--bd2);box-shadow:var(--shadow-sm);margin-bottom:20px;transition:transform .2s}
+.b2s-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.b2s-icon{font-size:24px;margin-bottom:10px}
+.b2s-title{font-size:16px;font-weight:700;letter-spacing:-.1px;margin-bottom:8px}
+.b2s-body{font-size:12px;color:var(--tx2);line-height:1.7}
+.watermark-viz{display:flex;flex-direction:column;gap:4px;margin-top:12px}
+.wm-partition{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-family:var(--mono);font-size:11px}
+.wm-partition.done{background:var(--teal-bg);color:var(--teal-tx)}
+.wm-partition.current{background:var(--amber-bg);color:var(--amber-tx);border:1.5px solid var(--amber-str)}
+.wm-partition.pending{background:var(--bg2);color:var(--tx3)}
+.wm-badge{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.08)}
+.nb-cell{border-radius:var(--rsm);overflow:hidden;border:1.5px solid var(--bd2);margin-top:12px;font-size:11px}
+.nb-cell-head{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--bd);font-size:10px;font-weight:600;color:var(--tx3)}
+.nb-cell-body{padding:10px 12px;font-family:var(--mono);font-size:10px;line-height:1.75;background:white;color:var(--tx2)}
+.nb-kw{color:var(--blue-tx);font-weight:600}
+.nb-str{color:var(--teal-tx)}
+.nb-cmt{color:var(--tx3);font-style:italic}
+.nb-var{color:var(--amber-tx)}
+
+/* ── CONFIG TABLE ── */
+#s6{background:var(--bg2)}
+.config-layout{display:flex;gap:24px;max-width:1100px;align-items:flex-start}
+.config-col{flex:1}
+.cfg-table{border-radius:var(--r);overflow:hidden;border:1.5px solid var(--bd2);box-shadow:var(--shadow-sm);background:white}
+.cfg-table-head{padding:14px 20px;background:var(--tx);color:white;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.cfg-group{border-bottom:1px solid var(--bd)}
+.cfg-group-label{padding:8px 14px;background:var(--bg2);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);border-bottom:1px solid var(--bd)}
+.cfg-row{display:flex;padding:9px 14px;gap:12px;border-bottom:1px solid var(--bd);align-items:flex-start;transition:background .12s}
+.cfg-row:hover{background:var(--bg)}
+.cfg-row:last-child{border-bottom:none}
+.cfg-col-name{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--blue-tx);background:var(--blue-bg);padding:2px 6px;border-radius:4px;flex-shrink:0;align-self:flex-start;white-space:nowrap}
+.cfg-col-name.amber{color:var(--amber-tx);background:var(--amber-bg)}
+.cfg-col-name.teal{color:var(--teal-tx);background:var(--teal-bg)}
+.cfg-col-name.purple{color:var(--purple-tx);background:var(--purple-bg)}
+.cfg-col-name.gray{color:var(--gray-tx);background:var(--gray-bg)}
+.cfg-col-body{flex:1}
+.cfg-col-desc{font-size:11px;color:var(--tx2);line-height:1.55}
+.cfg-col-ex{font-family:var(--mono);font-size:10px;color:var(--tx3);margin-top:2px}
+.cfg-schema-note{margin-top:16px;padding:14px 16px;border-radius:var(--rsm);background:white;border:1.5px solid var(--bd2);font-size:12px;color:var(--tx2);line-height:1.65}
+
+/* ── SEQUENCE ── */
+#s7{background:var(--bg)}
+.seq-layout{display:flex;gap:32px;max-width:1100px;align-items:flex-start}
+.seq-diagram{flex:1.3}
+.seq-info{flex:1}
+.seq-batch{border-radius:var(--r);border:2px solid;overflow:hidden;margin-bottom:0;transition:transform .2s,box-shadow .2s}
+.seq-batch:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.seq-batch.b1{border-color:var(--blue);background:var(--bg)}
+.seq-batch.b2{border-color:var(--teal);background:var(--bg)}
+.seq-batch.b3{border-color:var(--amber);background:var(--bg)}
+.seq-batch-head{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;font-size:11px;font-weight:700}
+.seq-batch-head.b1{background:var(--blue-bg);color:var(--blue-tx)}
+.seq-batch-head.b2{background:var(--teal-bg);color:var(--teal-tx)}
+.seq-batch-head.b3{background:var(--amber-bg);color:var(--amber-tx)}
+.seq-badge{font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,.1)}
+.seq-tables{display:flex;gap:8px;padding:12px 16px;flex-wrap:wrap}
+.seq-table-chip{padding:5px 10px;border-radius:6px;font-family:var(--mono);font-size:10px;font-weight:600;background:white;border:1px solid var(--bd2);color:var(--tx2);box-shadow:var(--shadow-sm)}
+.seq-arrow{display:flex;align-items:center;justify-content:center;height:28px;color:var(--tx3);font-size:13px}
+.seq-info-card{padding:20px;border-radius:var(--r);background:white;border:1.5px solid var(--bd2);box-shadow:var(--shadow-sm);margin-bottom:16px}
+.seq-info-title{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.seq-info-body{font-size:12px;color:var(--tx2);line-height:1.7}
+.seq-parallel-tag{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:8px}
+.seq-parallel-tag.yes{background:var(--teal-bg);color:var(--teal-tx)}
+.seq-parallel-tag.no{background:var(--amber-bg);color:var(--amber-tx)}
+.seq-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
+.seq-table th{padding:6px 10px;text-align:left;background:var(--bg2);font-weight:700;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--tx3)}
+.seq-table td{padding:7px 10px;border-bottom:1px solid var(--bd);color:var(--tx2)}
+.seq-table tr:last-child td{border-bottom:none}
+
+/* ── PARAM CHAIN ── */
+#s8{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%)}
+.chain-flow{display:flex;gap:0;max-width:1100px;align-items:stretch;overflow-x:auto;padding-bottom:8px}
+.chain-step{flex-shrink:0;width:180px;border-radius:var(--r);border:1.5px solid var(--bd2);background:white;box-shadow:var(--shadow-sm);overflow:hidden;transition:transform .2s,box-shadow .2s}
+.chain-step:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.chain-head{padding:10px 12px;font-size:11px;font-weight:700;border-bottom:1px solid var(--bd)}
+.chain-head.blue{background:var(--blue-bg);color:var(--blue-tx)}
+.chain-head.teal{background:var(--teal-bg);color:var(--teal-tx)}
+.chain-head.amber{background:var(--amber-bg);color:var(--amber-tx)}
+.chain-head.purple{background:var(--purple-bg);color:var(--purple-tx)}
+.chain-head.green{background:var(--green-bg);color:var(--green-tx)}
+.chain-head.gray{background:var(--gray-bg);color:var(--gray-tx)}
+.chain-sub{font-size:9px;font-weight:400;opacity:.7;display:block;margin-top:1px}
+.chain-params{padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.cp{font-family:var(--mono);font-size:9px;padding:3px 6px;border-radius:4px;color:var(--tx2);background:var(--bg2)}
+.cp.new{background:var(--teal-bg);color:var(--teal-tx);font-weight:600}
+.cp.derived{background:var(--amber-bg);color:var(--amber-tx);font-weight:600}
+.chain-arrow{width:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:16px}
+.chain-legend{display:flex;gap:16px;margin-top:16px;flex-wrap:wrap}
+.cl-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx2)}
+.cl-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ── DESIGN PROPS ── */
+#s9{background:var(--bg2)}
+.props-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px}
+.prop-card{padding:24px;border-radius:var(--r);border:1.5px solid var(--bd2);background:white;box-shadow:var(--shadow-sm);transition:transform .2s,box-shadow .2s}
+.prop-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.prop-icon{font-size:24px;margin-bottom:12px}
+.prop-title{font-size:15px;font-weight:700;margin-bottom:8px;letter-spacing:-.1px}
+.prop-body{font-size:12px;color:var(--tx2);line-height:1.7}
+.prop-pill{display:inline-block;margin-top:12px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:10px}
+.prop-pill.blue{background:var(--blue-bg);color:var(--blue-tx)}
+.prop-pill.teal{background:var(--teal-bg);color:var(--teal-tx)}
+.prop-pill.amber{background:var(--amber-bg);color:var(--amber-tx)}
+.prop-pill.purple{background:var(--purple-bg);color:var(--purple-tx)}
+.prop-pill.green{background:var(--green-bg);color:var(--green-tx)}
+
+/* ── SAMPLE OUTPUT ── */
+.sample-out-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin:18px 0 8px;padding-top:14px;border-top:1px solid var(--bd);display:flex;align-items:center;gap:7px}
+.sample-out-label::before{content:'▶';font-size:8px;color:#5fbd8a}
+.sample-out-block{font-family:var(--mono);font-size:9.5px;line-height:1.85;background:#1c1b18;color:#c8c5be;padding:13px 15px;border-radius:6px;white-space:pre;overflow-x:auto;display:block;margin-top:2px}
+.so-h{color:#89b4d8;font-weight:600}
+.so-ok{color:#5fbd8a}
+.so-val{color:#e8c47a}
+.so-dim{color:#5a5850}
+.so-err{color:#e07070}
+
+/* ── FOOTER ── */
+#footer-section{padding:48px 64px;text-align:center;border-top:1px solid var(--bd);background:var(--bg2)}
+#footer-section p{font-size:12px;color:var(--tx3);line-height:2}
+
+@media(max-width:900px){section{padding:80px 24px 48px}.props-grid{grid-template-columns:1fr}.two-path,.b2s-layout,.config-layout,.seq-layout{flex-direction:column}.medallion-flow{flex-wrap:wrap}.s-title{font-size:32px}}
+@media(max-width:600px){#nav-links{display:none}}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav id="nav">
+  <div id="nav-logo">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <rect width="10" height="10" rx="2" fill="#c97a2a" opacity=".9"/>
+      <rect x="12" width="10" height="10" rx="2" fill="#1565a8" opacity=".8"/>
+      <rect y="12" width="10" height="10" rx="2" fill="#c9a200" opacity=".8"/>
+      <rect x="12" y="12" width="10" height="10" rx="2" fill="#4a40b0" opacity=".7"/>
+    </svg>
+    Fabric ELT Pipeline
+    <span>Medallion Architecture</span>
+  </div>
+  <div id="nav-links">
+    <a class="nl" href="#s1">Overview</a>
+    <a class="nl" href="#s2">Layers</a>
+    <a class="nl" href="#s3">Pipeline Flow</a>
+    <a class="nl" href="#s4">src2brz</a>
+    <a class="nl" href="#s5">BRONZE2SILVER</a>
+    <a class="nl" href="#s6">Config</a>
+    <a class="nl" href="#s7">Sequence</a>
+    <a class="nl" href="#s8">Parameters</a>
+    <a class="nl" href="#s9">Design</a>
+  </div>
+  <div id="nav-badge">Microsoft Fabric · Metadata-Driven</div>
+</nav>
+
+<!-- ── DOTS ── -->
+<div id="dots">
+  <button class="dot active" data-s="s1" title="Overview"></button>
+  <button class="dot" data-s="s2" title="Medallion Layers"></button>
+  <button class="dot" data-s="s3" title="Pipeline Flow"></button>
+  <button class="dot" data-s="s4" title="src2brz"></button>
+  <button class="dot" data-s="s5" title="BRONZE2SILVER"></button>
+  <button class="dot" data-s="s6" title="Config Table"></button>
+  <button class="dot" data-s="s7" title="Sequence Orchestration"></button>
+  <button class="dot" data-s="s8" title="Parameter Chain"></button>
+  <button class="dot" data-s="s9" title="Design Principles"></button>
+</div>
+
+<!-- ── TOOLTIP ── -->
+<div id="tooltip">
+  <div id="tt-type" class="tt-type blue"></div>
+  <div id="tt-title" class="tt-title"></div>
+  <div id="tt-body" class="tt-body"></div>
+  <div id="tt-acts" class="tt-acts"></div>
+</div>
+
+
+<!-- ═══════ S1 — COVER ═══════ -->
+<section id="s1">
+  <div class="s-eyebrow">Microsoft Fabric · Metadata-Driven ELT · 2025</div>
+  <div class="s-title">One config table.<br><em>Every table flows through.</em></div>
+  <div class="s-sub">
+    A metadata-driven ELT framework on Microsoft Fabric where pipelines are pure
+    orchestrators — transformation logic lives in Python notebooks (at the Lakehouse→Warehouse boundary)
+    and T-SQL stored procedures (for warehouse-internal layers).
+    Add a row to a config table and the table is automatically ingested and transformed.
+  </div>
+  <div class="cover-stats">
+    <div class="stat-card"><div class="stat-num teal">4</div><div class="stat-label">Medallion Layers</div></div>
+    <div class="stat-card"><div class="stat-num blue">2</div><div class="stat-label">Config Tables</div></div>
+    <div class="stat-card"><div class="stat-num amber">2</div><div class="stat-label">Source Types</div></div>
+    <div class="stat-card"><div class="stat-num purple">0</div><div class="stat-label">Transform in Pipeline</div></div>
+  </div>
+  <div class="cover-badge">✦ Fabric Pipelines · Fabric Warehouse (silver+) · Lakehouse (bronze raw) · Python Notebook (B2S) · T-SQL SP (S2G+) · SCD Type 2</div>
+  <div class="s-section-num">01</div>
+</section>
+
+
+<!-- ═══════ S2 — MEDALLION ═══════ -->
+<section id="s2">
+  <div class="s-eyebrow">Data architecture</div>
+  <div class="s-title">Four layers.<br><em>Each with a clear purpose.</em></div>
+  <div class="s-sub">Bronze lives in the <strong>Lakehouse</strong> as raw files in their native format. Silver, Gold, and Platinum are <strong>Warehouse tables</strong> with SCD Type 2 history.</div>
+  <div class="medallion-flow">
+    <div class="medal-card bronze">
+      <div class="medal-layer">Layer 1 · Lakehouse</div>
+      <div class="medal-name">Bronze</div>
+      <div class="medal-desc">Raw files, native format preserved. Zero conversion — exact copy of what arrived.</div>
+      <div class="medal-items">
+        <div class="medal-item"><div class="mi-dot"></div>DB sources → Parquet files</div>
+        <div class="medal-item"><div class="mi-dot"></div>File sources → original format kept</div>
+        <div class="medal-item"><div class="mi-dot"></div>Partitioned by ingest hour</div>
+        <div class="medal-item"><div class="mi-dot"></div>Files/bronze/… in Lakehouse</div>
+      </div>
+      <div class="medal-wm">BRZ</div>
+    </div>
+    <div class="medal-arrow">→</div>
+    <div class="medal-card silver">
+      <div class="medal-layer">Layer 2 · Warehouse</div>
+      <div class="medal-name">Silver</div>
+      <div class="medal-desc">Cleansed and conformed. Python notebook reads bronze, SCD2 merge into Warehouse tables.</div>
+      <div class="medal-items">
+        <div class="medal-item"><div class="mi-dot"></div>Python pandas/pyarrow reader</div>
+        <div class="medal-item"><div class="mi-dot"></div>SCD2: valid_from / valid_to / is_current</div>
+        <div class="medal-item"><div class="mi-dot"></div>COPY INTO + MERGE via pyodbc</div>
+        <div class="medal-item"><div class="mi-dot"></div>[silver].* in Fabric Warehouse</div>
+      </div>
+      <div class="medal-wm">SIL</div>
+    </div>
+    <div class="medal-arrow">→</div>
+    <div class="medal-card gold">
+      <div class="medal-layer">Layer 3 · Warehouse</div>
+      <div class="medal-name">Gold</div>
+      <div class="medal-desc">Business-level star schema. Warehouse-to-warehouse T-SQL via stored procedures — no notebook needed once data is inside the Warehouse.</div>
+      <div class="medal-items">
+        <div class="medal-item"><div class="mi-dot"></div>Dim / Fact tables</div>
+        <div class="medal-item"><div class="mi-dot"></div>Pure T-SQL stored procedures</div>
+        <div class="medal-item"><div class="mi-dot"></div>SqlServerStoredProcedure activity</div>
+        <div class="medal-item"><div class="mi-dot"></div>[gold].* in Fabric Warehouse</div>
+      </div>
+      <div class="medal-wm">GLD</div>
+    </div>
+    <div class="medal-arrow">→</div>
+    <div class="medal-card platinum">
+      <div class="medal-layer">Layer 4 · Warehouse</div>
+      <div class="medal-name">Platinum</div>
+      <div class="medal-desc">Publication-ready datasets. Same warehouse-internal T-SQL pattern as Gold — stored procedures, no Python.</div>
+      <div class="medal-items">
+        <div class="medal-item"><div class="mi-dot"></div>Power BI semantic models</div>
+        <div class="medal-item"><div class="mi-dot"></div>T-SQL stored procedures</div>
+        <div class="medal-item"><div class="mi-dot"></div>SLA-governed refresh</div>
+        <div class="medal-item"><div class="mi-dot"></div>[platinum].* in Fabric Warehouse</div>
+      </div>
+      <div class="medal-wm">PLT</div>
+    </div>
+  </div>
+  <div class="s-section-num">02</div>
+</section>
+
+
+<!-- ═══════ S3 — PIPELINE FLOW ═══════ -->
+<section id="s3">
+  <div class="s-eyebrow">Orchestration map</div>
+  <div class="s-title">Click a path to trace it.<br><em>Click any box to inspect.</em></div>
+  <div class="s-sub">Every run follows the same coordinator-driven pattern. Source type determines which function pipeline fires.</div>
+
+  <div class="route-btns">
+    <button class="rb none active" id="rb-none" onclick="setRoute(null)"><span class="rb-dot" style="background:var(--tx3)"></span>Show all</button>
+    <button class="rb db" id="rb-db" onclick="setRoute('db')"><span class="rb-dot"></span>SAP → Bronze</button>
+    <button class="rb file" id="rb-file" onclick="setRoute('file')"><span class="rb-dot"></span>File Source → Bronze</button>
+    <button class="rb sp" id="rb-sp" onclick="setRoute('sp')"><span class="rb-dot"></span>SharePoint List → Bronze</button>
+    <button class="rb b2s" id="rb-b2s" onclick="setRoute('b2s')"><span class="rb-dot"></span>Bronze → Silver</button>
+    <button class="rb sil" id="rb-sil" onclick="setRoute('sil')"><span class="rb-dot"></span>Silver → Gold (SP · planned)</button>
+  </div>
+
+  <div class="flow-outer">
+    <div class="flow-wrap" id="flow-wrap">
+      <svg class="flow-svg" id="flow-svg">
+        <defs>
+          <marker id="arr-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 Z" fill="#c8c5be"/></marker>
+          <marker id="arr-db"   viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 Z" fill="#b36900"/></marker>
+          <marker id="arr-file" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 Z" fill="#18916a"/></marker>
+          <marker id="arr-b2s"  viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 Z" fill="#1565a8"/></marker>
+          <marker id="arr-sil"  viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 Z" fill="#7268d4"/></marker>
+          <marker id="arr-sp"   viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 Z" fill="#5c8f1e"/></marker>
+        </defs>
+      </svg>
+
+      <!-- Application -->
+      <div class="fn app-node blue" id="fn-app-s2b" style="width:148px;left:0;top:52px">src2brz<sub>application_wf</sub></div>
+      <div class="fn app-node teal" id="fn-app-b2s" style="width:148px;left:0;top:192px">bronze2silver<sub>application_wf</sub></div>
+      <!-- Coordinator -->
+      <div class="fn amber" id="fn-coord" style="width:118px;left:192px;top:128px">Coordinator<sub>routes by layer</sub></div>
+      <!-- Get Config -->
+      <div class="fn blue"   id="fn-s2b-cfg" style="width:152px;left:358px;top:52px">src2brz<sub>get_config</sub></div>
+      <div class="fn teal"   id="fn-b2s-cfg" style="width:152px;left:358px;top:192px">bronze2silver<sub>get_config</sub></div>
+      <div class="fn purple" id="fn-sil-cfg" style="width:152px;left:358px;top:310px">silver2gold<sub>get_config</sub></div>
+      <!-- Process Object -->
+      <div class="fn blue"   id="fn-s2b-obj" style="width:152px;left:554px;top:52px">src2brz<sub>process_object</sub></div>
+      <div class="fn teal"   id="fn-b2s-obj" style="width:152px;left:554px;top:192px">bronze2silver<sub>process_object</sub></div>
+      <div class="fn purple" id="fn-sil-obj" style="width:152px;left:554px;top:310px">silver2gold<sub>process_object</sub></div>
+      <!-- Switch + Refresh -->
+      <div class="fn blue"   id="fn-switch"  style="width:118px;left:754px;top:20px">Switch<sub>on bronze_file_format</sub></div>
+      <div class="fn teal"   id="fn-refresh" style="width:152px;left:754px;top:192px">refresh_warehouse<sub>_table</sub></div>
+      <!-- Leaf -->
+      <div class="fn amber"  id="fn-sap"       style="width:156px;left:920px;top:0">copy_from_sap<sub>→ parquet ← SAP</sub></div>
+      <div class="fn teal"   id="fn-file-copy" style="width:156px;left:920px;top:64px">copy_file_as_is<sub>binary copy ← File</sub></div>
+      <div class="fn teal"   id="fn-sp-list"   style="width:156px;left:920px;top:128px">copy_sharepoint_list<sub>→ parquet ← SP List</sub></div>
+      <div class="fn teal"   id="fn-nbk"       style="width:156px;left:920px;top:192px">transform_nbk<sub>Python notebook</sub></div>
+      <div class="fn teal"   id="fn-dq-nbk"   style="width:152px;left:1096px;top:192px">dq_nbk<sub>Python notebook</sub></div>
+      <div class="fn purple" id="fn-sil-sp"    style="width:156px;left:920px;top:310px">update_load_status<sub>SP — T-SQL</sub></div>
+    </div>
+  </div>
+
+  <!-- hint -->
+  <div style="font-size:11px;color:var(--tx3);margin-top:8px">Click any block to open its pipeline inspector</div>
+
+  <div class="s-section-num">03</div>
+</section>
+
+
+<!-- ═══════ S4 — src2brz ═══════ -->
+<section id="s4">
+  <div class="s-eyebrow">Source ingestion</div>
+  <div class="s-title">Two source types.<br><em>One Switch activity.</em></div>
+  <div class="s-sub">The <code style="font-family:var(--mono)">bronze_file_format</code> column in <code style="font-family:var(--mono)">elt_table_config</code> decides which path fires. Files always land in bronze with their original format preserved.</div>
+
+  <div class="two-path">
+    <div class="path-card db">
+      <div class="path-tag">bronze_file_format = parquet_none_header</div>
+      <div class="path-title">DB Source</div>
+      <div class="path-desc">On-premise SQL Server via data gateway. The Copy activity is the only Fabric component that supports gateway connections — notebooks cannot reach on-prem directly.</div>
+      <div class="path-steps">
+        <div class="ps-item"><div class="ps-num">1</div><div><div class="ps-label">Copy Activity (with gateway)</div>SQL Server → Parquet in Lakehouse Files/bronze/ with pipeline metadata appended as additionalColumns<div class="ps-code">bronze/{datasubject}/{classification}/{sourcesystem}/{sourceschema}/{tablename}/{ingest_channel}/{partition}/</div></div></div>
+        <div class="ps-item"><div class="ps-num">2</div><div><div class="ps-label">Update Watermark</div>SP sets <code style="font-family:var(--mono);font-size:10px">ingest_partition</code> to the partition just written</div></div>
+        <div class="ps-item"><div class="ps-num" style="background:rgba(10,102,71,.12)">✓</div><div><div class="ps-label">Column renames &amp; type overrides at bronze→silver</div><code style="font-family:var(--mono);font-size:10px">elt_schema_config</code> is read by the Python notebook (Cell 4b), not by this pipeline — bronze stays a raw faithful copy</div></div>
+      </div>
+      <div class="path-wm">DB</div>
+    </div>
+    <div class="path-vs"><div class="path-vs-c">or</div></div>
+    <div class="path-card file">
+      <div class="path-tag">bronze_file_format = csv / parquet / json / excel</div>
+      <div class="path-title">File Source</div>
+      <div class="path-desc">Files already in the Lakehouse landing zone. Binary Copy moves them to bronze unchanged — format parsing happens at bronze→silver in the Python notebook via pandas/pyarrow.</div>
+      <div class="path-steps">
+        <div class="ps-item"><div class="ps-num">1</div><div><div class="ps-label">Binary Copy (no format conversion)</div>Copies <code style="font-family:var(--mono);font-size:10px">{custom_source_path}/{sourcetablename}</code> → bronze partition<div class="ps-code">bronze/…/{ingest_channel}/{trigger_hour}/</div></div></div>
+        <div class="ps-item"><div class="ps-num">2</div><div><div class="ps-label">Update Watermark</div>SP sets <code style="font-family:var(--mono);font-size:10px">ingest_partition = formatDateTime(trigger_time,'yyyy-MM-dd-HH')</code></div></div>
+        <div class="ps-item"><div class="ps-num" style="background:rgba(10,102,71,.12)">✓</div><div><div class="ps-label">file_type carried downstream</div><code style="font-family:var(--mono);font-size:10px">file_type</code> passed all the way to the notebook so the right pandas reader is picked (<code style="font-family:var(--mono);font-size:10px">read_csv</code>, <code style="font-family:var(--mono);font-size:10px">read_json</code>, etc.)</div></div>
+      </div>
+      <div class="path-wm">FILE</div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;padding:14px 20px;border-radius:var(--rsm);background:var(--bg2);border:1px solid var(--bd2);font-size:12px;color:var(--tx2);max-width:780px;line-height:1.7">
+    <strong style="color:var(--tx)">Config columns consumed here:</strong>&nbsp;
+    <code style="font-family:var(--mono);background:var(--amber-bg);color:var(--amber-tx);padding:2px 6px;border-radius:4px">bronze_file_format</code> Switch discriminator &nbsp;·&nbsp;
+    <code style="font-family:var(--mono);background:var(--teal-bg);color:var(--teal-tx);padding:2px 6px;border-radius:4px">custom_source_path</code> file landing folder &nbsp;·&nbsp;
+    <code style="font-family:var(--mono);background:var(--teal-bg);color:var(--teal-tx);padding:2px 6px;border-radius:4px">file_type</code> picks the pandas reader at bronze→silver &nbsp;·&nbsp;
+    <code style="font-family:var(--mono);background:var(--purple-bg);color:var(--purple-tx);padding:2px 6px;border-radius:4px">ingest_partition</code> watermark updated after copy
+  </div>
+  <div class="s-section-num">04</div>
+</section>
+
+
+<!-- ═══════ S5 — BRONZE2SILVER ═══════ -->
+<section id="s5">
+  <div class="s-eyebrow">Silver transformation</div>
+  <div class="s-title">Partition by partition.<br><em>Resumable by design.</em></div>
+  <div class="s-sub">The pipeline never processes everything — only bronze partitions newer than the last watermark. A <strong>Python-only notebook</strong> reads the native-format bronze file and merges into the Warehouse silver table with SCD Type 2 semantics. The pipeline only orchestrates.</div>
+
+  <div class="b2s-layout">
+    <div class="b2s-col">
+      <div class="b2s-card">
+        <div class="b2s-icon">💧</div>
+        <div class="b2s-title">Partition Watermark</div>
+        <div class="b2s-body"><code style="font-family:var(--mono)">ingest_partition</code> in <code style="font-family:var(--mono)">elt_table_config</code> records the last partition successfully loaded to silver. On each run, the pipeline lists bronze partitions, filters to those newer than this value, and processes them in ascending order.</div>
+        <div class="watermark-viz">
+          <div class="wm-partition done">2025-01-10-08 <span class="wm-badge">done ✓</span></div>
+          <div class="wm-partition done">2025-01-10-09 <span class="wm-badge">done ✓</span></div>
+          <div class="wm-partition current">2025-01-10-10 <span class="wm-badge">← processing now</span></div>
+          <div class="wm-partition pending">2025-01-10-11 <span class="wm-badge">pending</span></div>
+          <div class="wm-partition pending">2025-01-10-12 <span class="wm-badge">pending</span></div>
+        </div>
+      </div>
+      <div class="b2s-card">
+        <div class="b2s-icon">🔄</div>
+        <div class="b2s-title">Sort via OPENJSON in Warehouse</div>
+        <div class="b2s-body">GetMetadata returns a JSON array of folder names. A Lookup activity passes it through a Warehouse T-SQL query with <code style="font-family:var(--mono)">ORDER BY [name] ASC</code> using <code style="font-family:var(--mono)">OPENJSON()</code>. This guarantees partitions always process oldest-first so the watermark only moves forward.</div>
+      </div>
+    </div>
+    <div class="b2s-col">
+      <div class="b2s-card">
+        <div class="b2s-icon">📓</div>
+        <div class="b2s-title">Python-Only Notebook · SCD2</div>
+        <div class="b2s-body">No PySpark, no <code style="font-family:var(--mono);font-size:10px">%%sql</code>. Reads bronze in its native format with pandas/pyarrow, stages a parquet to Lakehouse, then runs <code style="font-family:var(--mono);font-size:10px">COPY INTO</code> + close-and-insert merge against a Fabric Warehouse silver table via pyodbc.</div>
+        <div class="nb-cell">
+          <div class="nb-cell-head">
+            <span style="background:var(--amber-bg);color:var(--amber-tx);padding:1px 6px;border-radius:3px;font-size:9px">Python</span>
+            Cell A — Read bronze + add SCD2 row_hash
+          </div>
+          <div class="nb-cell-body">
+<span class="nb-cmt"># Read bronze file in its native format (no conversion in src2brz)</span>
+<span class="nb-kw">if</span> file_type == <span class="nb-str">"parquet"</span>:
+    df = pads.dataset(bronze_local, format=<span class="nb-str">"parquet"</span>).to_table().to_pandas()
+<span class="nb-kw">elif</span> file_type == <span class="nb-str">"csv"</span>:    df = pd.read_csv(files)
+<span class="nb-kw">elif</span> file_type == <span class="nb-str">"json"</span>:   df = pd.read_json(files, lines=<span class="nb-kw">True</span>)
+<span class="nb-kw">elif</span> file_type == <span class="nb-str">"excel"</span>:  df = pd.read_excel(files)
+
+<span class="nb-cmt"># SCD2 change detection = SHA-256 over business columns only</span>
+df[<span class="nb-str">"row_hash"</span>]   = df[business_cols].apply(_row_to_hash, axis=1)
+df[<span class="nb-str">"valid_from"</span>] = now_utc
+df[<span class="nb-str">"valid_to"</span>]   = <span class="nb-kw">None</span>
+df[<span class="nb-str">"is_current"</span>] = <span class="nb-kw">True</span>
+          </div>
+        </div>
+        <div class="nb-cell" style="margin-top:8px">
+          <div class="nb-cell-head">
+            <span style="background:var(--blue-bg);color:var(--blue-tx);padding:1px 6px;border-radius:3px;font-size:9px">Python → T-SQL</span>
+            Cell B — COPY INTO + SCD2 merge (pyodbc)
+          </div>
+          <div class="nb-cell-body">
+<span class="nb-cmt"># Stage parquet to Lakehouse Files/_staging/, then let Warehouse pull it</span>
+pq.write_table(pa.Table.from_pandas(df), staging_local)
+
+execute(conn, <span class="nb-str">f"""
+COPY INTO [silver].[{tablename}__stg_{run_id}]
+FROM '{staging_abfss}' WITH (FILE_TYPE = 'PARQUET')
+"""</span>)
+
+<span class="nb-cmt"># SCD2 close: mark old current rows stale when row_hash changed</span>
+execute(conn, <span class="nb-str">f"""
+UPDATE t SET t.valid_to = s.valid_from, t.is_current = 0
+FROM [silver].[{tablename}] t
+JOIN [silver].[{tablename}__stg_{run_id}] s ON {pk_join}
+WHERE t.is_current = 1 AND t.row_hash <> s.row_hash
+"""</span>)
+
+<span class="nb-cmt"># SCD2 insert: new versions (changed PKs + brand-new PKs)</span>
+execute(conn, <span class="nb-str">f"""
+INSERT INTO [silver].[{tablename}] ({col_list}, valid_from, valid_to, is_current)
+SELECT s.*, s.valid_from, NULL, 1
+FROM [silver].[{tablename}__stg_{run_id}] s
+LEFT JOIN [silver].[{tablename}] t ON {pk_join} AND t.is_current = 1
+WHERE t.[{pk}] IS NULL
+"""</span>)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="s-section-num">05</div>
+</section>
+
+
+<!-- ═══════ S6 — CONFIG TABLE ═══════ -->
+<section id="s6">
+  <div class="s-eyebrow">Metadata model</div>
+  <div class="s-title">One table.<br><em>Every pipeline decision.</em></div>
+  <div class="s-sub">All orchestration behaviour is read from <code style="font-family:var(--mono)">elt_table_config</code> at runtime. No pipeline JSON changes needed to add, remove, or modify a table.</div>
+
+  <div class="config-layout">
+    <div class="config-col">
+      <div class="cfg-table">
+        <div class="cfg-table-head">
+          <span>elt_table_config</span>
+          <span style="font-size:9px;font-weight:400;opacity:.6">primary config — one row per table per layer</span>
+        </div>
+        <!-- Routing -->
+        <div class="cfg-group">
+          <div class="cfg-group-label">🧭 Routing — drives pipeline decisions</div>
+          <div class="cfg-row"><span class="cfg-col-name amber">layer</span><div class="cfg-col-body"><div class="cfg-col-desc">Which medallion layer processes this row. Coordinator reads this to route to the right get_config pipeline.</div><div class="cfg-col-ex">bronze, silver, gold, platinum</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name amber">bronze_file_format</span><div class="cfg-col-body"><div class="cfg-col-desc">Drives the Switch activity in process_object. Determines which function pipeline fires for this table.</div><div class="cfg-col-ex">parquet_none_header, csv, parquet, json, excel</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name amber">sequence_number</span><div class="cfg-col-body"><div class="cfg-col-desc">Processing order within a run. Tables with the same sequence can run in parallel (src2brz) or sequentially (bronze2silver). Lower numbers run first.</div><div class="cfg-col-ex">1, 2, 3</div></div></div>
+        </div>
+        <!-- Path -->
+        <div class="cfg-group">
+          <div class="cfg-group-label">📂 Path — constructs Lakehouse folder structure</div>
+          <div class="cfg-row"><span class="cfg-col-name">datasubject</span><div class="cfg-col-body"><div class="cfg-col-desc">Business domain. Used as top-level folder in bronze and silver paths.</div><div class="cfg-col-ex">finance, logistics, hr</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">classification</span><div class="cfg-col-body"><div class="cfg-col-desc">Data sensitivity classification. Second folder level.</div><div class="cfg-col-ex">confidential, internal, public</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">sourcesystem</span><div class="cfg-col-body"><div class="cfg-col-desc">Source system identifier. Used as a folder segment in the bronze path.</div><div class="cfg-col-ex">sqlvm_prd01, erp, sftp_vendor</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">sourceschema</span><div class="cfg-col-body"><div class="cfg-col-desc">Schema name in the source system. Folder segment in bronze path.</div><div class="cfg-col-ex">dbo, sales, hr</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">tablename</span><div class="cfg-col-body"><div class="cfg-col-desc">Bronze folder leaf AND target Warehouse table name. Silver target is <code style="font-family:var(--mono);font-size:10px">[silver].[{tablename}]</code> in Fabric Warehouse.</div><div class="cfg-col-ex">orders, customers, invoice</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">container</span><div class="cfg-col-body"><div class="cfg-col-desc">Legacy folder name kept for path compatibility in bronze only. Silver and above are Warehouse tables — no container folder needed.</div><div class="cfg-col-ex">bronze</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">ingest_channel</span><div class="cfg-col-body"><div class="cfg-col-desc">How data arrives. Used as a sub-folder in bronze to separate different ingestion modes for the same table.</div><div class="cfg-col-ex">full_load, incremental, manual</div></div></div>
+        </div>
+        <!-- File sources -->
+        <div class="cfg-group">
+          <div class="cfg-group-label">📄 File sources — used when bronze_file_format ≠ parquet_none_header</div>
+          <div class="cfg-row"><span class="cfg-col-name teal">custom_source_path</span><div class="cfg-col-body"><div class="cfg-col-desc">Landing zone folder in Lakehouse Files/ where the source file sits before ingestion to bronze.</div><div class="cfg-col-ex">landing/vendor_feeds/acme</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name teal">file_type</span><div class="cfg-col-body"><div class="cfg-col-desc">Tells the bronze2silver Python notebook which pandas reader to use (<code style="font-family:var(--mono)">read_parquet</code>, <code style="font-family:var(--mono)">read_csv</code>, <code style="font-family:var(--mono)">read_json</code>, <code style="font-family:var(--mono)">read_xml</code>, <code style="font-family:var(--mono)">read_excel</code>). Must match the actual bronze format.</div><div class="cfg-col-ex">parquet, csv, json, xml, excel</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name teal">sourcetablename</span><div class="cfg-col-body"><div class="cfg-col-desc">For file sources: the file name pattern to pick up from custom_source_path. For DB sources: the source table name passed to the SQL query.</div><div class="cfg-col-ex">orders.csv, transactions_*.parquet</div></div></div>
+        </div>
+        <!-- Watermark -->
+        <div class="cfg-group">
+          <div class="cfg-group-label">⏱ Watermark — tracks processing state</div>
+          <div class="cfg-row"><span class="cfg-col-name purple">ingest_partition</span><div class="cfg-col-body"><div class="cfg-col-desc">The last partition successfully processed. On the next run, only partitions <em>greater than</em> this value are processed. Updated by <code style="font-family:var(--mono)">update_load_status</code> SP after each successful partition.</div><div class="cfg-col-ex">2025-01-10-09, ingest_partition=2025-01-10-09</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name purple">last_loaded_dt</span><div class="cfg-col-body"><div class="cfg-col-desc">Timestamp of the last successful load. Used for auditing and incremental SQL queries on DB sources.</div><div class="cfg-col-ex">2025-01-10T09:00:00Z</div></div></div>
+        </div>
+        <!-- Control -->
+        <div class="cfg-group">
+          <div class="cfg-group-label">⚙️ Control flags</div>
+          <div class="cfg-row"><span class="cfg-col-name gray">full_refresh_flag</span><div class="cfg-col-body"><div class="cfg-col-desc">When <code style="font-family:var(--mono)">Y</code>, the notebook <strong>TRUNCATE</strong>s the silver table and bulk-inserts the bronze partition (SCD2 history is reset). When <code style="font-family:var(--mono)">N</code>, it performs the close-and-insert SCD2 merge.</div><div class="cfg-col-ex">Y, N</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name gray">criteria_columns</span><div class="cfg-col-body"><div class="cfg-col-desc">Business-key column(s) used as the <strong>SCD2 merge key</strong>. Comma-separated. If empty, the notebook falls back to append-only (all rows inserted as new versions).</div><div class="cfg-col-ex">id, order_id, customer_id,tenant_id</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-col" style="max-width:340px">
+      <div class="cfg-table">
+        <div class="cfg-table-head">
+          <span>elt_schema_config</span>
+          <span style="font-size:9px;font-weight:400;opacity:.6">sparse override list — bronze→silver only</span>
+        </div>
+        <div class="cfg-group">
+          <div class="cfg-group-label">Read by the Python notebook (Cell 4b) — not by src2brz pipelines</div>
+          <div class="cfg-row"><span class="cfg-col-name">table_id</span><div class="cfg-col-body"><div class="cfg-col-desc">FK to elt_table_config.table_id. Links overrides to their parent table.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">source_column_name</span><div class="cfg-col-body"><div class="cfg-col-desc">Column name as it appears in the bronze file (source header). Only populate where it differs from the silver target name.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">target_column_name</span><div class="cfg-col-body"><div class="cfg-col-desc">Column name to use in the silver Warehouse table. Used for <code style="font-family:var(--mono)">df.rename()</code> in the notebook.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">source_data_type</span><div class="cfg-col-body"><div class="cfg-col-desc">Source type hint (informational).</div><div class="cfg-col-ex">varchar, nvarchar</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">target_data_type</span><div class="cfg-col-body"><div class="cfg-col-desc">Explicit T-SQL type override. Notebook maps this to a pandas dtype and casts before staging. Only populate where auto-inference would be wrong.</div><div class="cfg-col-ex">decimal, datetime2, uniqueidentifier</div></div></div>
+        </div>
+      </div>
+
+      <div class="cfg-schema-note" style="margin-top:16px">
+        <strong style="display:block;margin-bottom:6px">Sparse override — only non-trivial rows</strong>
+        Populate a row only when: (1) the bronze column header differs from the silver column name (rename), or (2) pandas auto-inference would pick the wrong type (explicit cast). Absent columns fall back to auto-inference. Typical table has 0–5 override rows.
+      </div>
+
+      <div class="cfg-schema-note" style="margin-top:12px">
+        <strong style="display:block;margin-bottom:6px">update_load_status SP</strong>
+        Called after every successful partition write. Updates <code style="font-family:var(--mono)">ingest_partition</code> (and <code style="font-family:var(--mono)">last_loaded_dt</code> for silver). The CATCH block handles Fabric concurrency error 24556 with a retry, making it safe under parallel runs.
+      </div>
+
+      <div class="cfg-table" style="margin-top:16px">
+        <div class="cfg-table-head">
+          <span>elt_transform_config</span>
+          <span style="font-size:9px;font-weight:400;opacity:.6">config-driven transforms — Cell 4c</span>
+        </div>
+        <div class="cfg-group">
+          <div class="cfg-group-label">Read by bronze2silver_transform_nbk (Cell 4c) — ordered by sequence_number</div>
+          <div class="cfg-row"><span class="cfg-col-name">table_id</span><div class="cfg-col-body"><div class="cfg-col-desc">FK to elt_table_config. Links rules to their silver target table.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name amber">transform_type</span><div class="cfg-col-body"><div class="cfg-col-desc">One of: <code style="font-family:var(--mono)">add_literal_column</code> | <code style="font-family:var(--mono)">remove_column</code> | <code style="font-family:var(--mono)">filter_rows</code> | <code style="font-family:var(--mono)">dedup</code> | <code style="font-family:var(--mono)">split_datetime</code> | <code style="font-family:var(--mono)">union_table</code> | <code style="font-family:var(--mono)">unpivot</code></div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">source_column</span><div class="cfg-col-body"><div class="cfg-col-desc">Input column name — used by split_datetime, unpivot.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">target_column</span><div class="cfg-col-body"><div class="cfg-col-desc">Output column name — used by add_literal_column.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name teal">rule_value</span><div class="cfg-col-body"><div class="cfg-col-desc">Transform-specific parameter. Examples: site name for add_literal_column; comma-sep columns for remove_column; pandas query string for filter_rows; secondary table_id for union_table; id_vars/value_vars JSON for unpivot.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">sequence_number</span><div class="cfg-col-body"><div class="cfg-col-desc">Execution order within a table_id — lower runs first. Allows chaining (e.g. filter_rows before dedup).</div></div></div>
+        </div>
+      </div>
+
+      <div class="cfg-table" style="margin-top:16px">
+        <div class="cfg-table-head">
+          <span>elt_dq_config</span>
+          <span style="font-size:9px;font-weight:400;opacity:.6">data quality rules — dq_nbk</span>
+        </div>
+        <div class="cfg-group">
+          <div class="cfg-group-label">Read by bronze2silver_dq_nbk — evaluated against silver rows (is_current = 1)</div>
+          <div class="cfg-row"><span class="cfg-col-name">table_id</span><div class="cfg-col-body"><div class="cfg-col-desc">FK to elt_table_config (bronze2silver row).</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">column_name</span><div class="cfg-col-body"><div class="cfg-col-desc">Silver column to validate.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name amber">rule_type</span><div class="cfg-col-body"><div class="cfg-col-desc"><code style="font-family:var(--mono)">not_null</code> | <code style="font-family:var(--mono)">allowed_values</code> | <code style="font-family:var(--mono)">range</code> | <code style="font-family:var(--mono)">regex</code></div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name teal">rule_value</span><div class="cfg-col-body"><div class="cfg-col-desc">Rule parameter: comma-sep list for allowed_values; <code style="font-family:var(--mono)">min:0,max:100</code> for range; regex pattern for regex; NULL for not_null.</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">action</span><div class="cfg-col-body"><div class="cfg-col-desc"><code style="font-family:var(--mono)">warn</code> (log only) | <code style="font-family:var(--mono)">flag</code> (planned). Results always written to elt_dq_results regardless of action.</div><div class="cfg-col-ex">warn</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name">is_active</span><div class="cfg-col-body"><div class="cfg-col-desc">Toggle a rule off without deleting it.</div><div class="cfg-col-ex">1, 0</div></div></div>
+        </div>
+      </div>
+
+      <div class="cfg-schema-note" style="margin-top:12px">
+        <strong style="display:block;margin-bottom:6px">elt_dq_results</strong>
+        Audit log written by the DQ notebook after each run. One row per rule per pipeline_run_id. Queryable for trends, pass-rate dashboards, and alerting. Columns: <code style="font-family:var(--mono)">pipeline_run_id</code>, <code style="font-family:var(--mono)">table_id</code>, <code style="font-family:var(--mono)">column_name</code>, <code style="font-family:var(--mono)">rule_type</code>, <code style="font-family:var(--mono)">fail_count</code>, <code style="font-family:var(--mono)">total_count</code>, <code style="font-family:var(--mono)">pass_rate_pct</code>, <code style="font-family:var(--mono)">checked_at</code>.
+      </div>
+    </div>
+  </div>
+  <div class="s-section-num">06</div>
+</section>
+
+
+<!-- ═══════ S7 — SEQUENCE ORCHESTRATION ═══════ -->
+<section id="s7">
+  <div class="s-eyebrow">Execution model</div>
+  <div class="s-title">Sequences enforce<br><em>dependency ordering.</em></div>
+  <div class="s-sub"><code style="font-family:var(--mono)">sequence_number</code> groups tables into batches. Batches run one after another — a higher sequence never starts until all tables in the lower sequence finish.</div>
+
+  <div class="seq-layout">
+    <div class="seq-diagram">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-bottom:12px">get_config → ForEach sequence (sequential outer loop)</div>
+
+      <div class="seq-batch b1">
+        <div class="seq-batch-head b1">
+          <span>Sequence 1 — process_object call #1</span>
+          <span class="seq-badge">runs first</span>
+        </div>
+        <div class="seq-tables">
+          <span class="seq-table-chip">orders</span>
+          <span class="seq-table-chip">customers</span>
+          <span class="seq-table-chip">products</span>
+          <span class="seq-table-chip">suppliers</span>
+        </div>
+      </div>
+
+      <div class="seq-arrow">↓ waits for all Sequence 1 tables to complete</div>
+
+      <div class="seq-batch b2">
+        <div class="seq-batch-head b2">
+          <span>Sequence 2 — process_object call #2</span>
+          <span class="seq-badge">depends on seq 1</span>
+        </div>
+        <div class="seq-tables">
+          <span class="seq-table-chip">order_lines</span>
+          <span class="seq-table-chip">transactions</span>
+        </div>
+      </div>
+
+      <div class="seq-arrow">↓ waits for all Sequence 2 tables to complete</div>
+
+      <div class="seq-batch b3">
+        <div class="seq-batch-head b3">
+          <span>Sequence 3 — process_object call #3</span>
+          <span class="seq-badge">depends on seq 2</span>
+        </div>
+        <div class="seq-tables">
+          <span class="seq-table-chip">daily_summary</span>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;padding:12px 16px;border-radius:var(--rsm);background:var(--bg2);border:1px solid var(--bd);font-size:11px;color:var(--tx2)">
+        <strong style="color:var(--tx)">How it works in the pipeline:</strong> get_config does a distinct <code style="font-family:var(--mono)">sequence_number</code> query, then calls process_object for each — passing the <em>full</em> table_config array plus the current sequence_number. process_object filters to matching rows internally.
+      </div>
+    </div>
+
+    <div class="seq-info">
+      <div class="seq-info-card">
+        <div class="seq-info-title">
+          Within-sequence parallelism
+          <span class="seq-parallel-tag yes">varies by layer</span>
+        </div>
+        <div class="seq-info-body">Tables within the same sequence don't necessarily run sequentially — it depends on which layer's process_object runs them.</div>
+        <table class="seq-table">
+          <tr><th>Layer</th><th>Inner ForEach</th><th>Effect</th></tr>
+          <tr><td><code style="font-family:var(--mono);font-size:10px">src2brz</code></td><td><span class="seq-parallel-tag yes">parallel</span></td><td style="font-size:10px">All tables in a sequence copy simultaneously</td></tr>
+          <tr><td><code style="font-family:var(--mono);font-size:10px">bronze2silver</code></td><td><span class="seq-parallel-tag no">sequential</span></td><td style="font-size:10px">Tables process one at a time within a sequence</td></tr>
+        </table>
+      </div>
+
+      <div class="seq-info-card">
+        <div class="seq-info-title">How to use sequence_number</div>
+        <div class="seq-info-body">
+          Set <code style="font-family:var(--mono)">sequence_number = 1</code> for base tables with no upstream dependencies.
+          Set <code style="font-family:var(--mono)">sequence_number = 2</code> for tables that JOIN or depend on sequence 1 outputs.
+          Tables with no cross-dependencies can all share the same sequence number and run in the same batch.
+        </div>
+      </div>
+
+      <div class="seq-info-card">
+        <div class="seq-info-title">Tip: how process_object filters</div>
+        <div class="seq-info-body">
+          The entire <code style="font-family:var(--mono)">table_config</code> array is passed to each process_object call.
+          It uses a Filter activity (<code style="font-family:var(--mono)">@equals(item().sequence_number, pipeline().parameters.sequence_number)</code>) to select only its batch.
+          This avoids a separate config query per sequence.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="s-section-num">07</div>
+</section>
+
+
+<!-- ═══════ S8 — PARAMETER CHAIN ═══════ -->
+<section id="s8">
+  <div class="s-eyebrow">Data flow</div>
+  <div class="s-title">Every parameter<br><em>traced from trigger to notebook.</em></div>
+  <div class="s-sub">Parameters enter at the trigger and are passed through every layer — enriched at each stage — until the notebook has everything it needs to build paths and run SQL.</div>
+
+  <div class="chain-flow">
+    <!-- Trigger -->
+    <div class="chain-step">
+      <div class="chain-head gray">
+        Schedule Trigger
+        <span class="chain-sub">Fabric schedule</span>
+      </div>
+      <div class="chain-params">
+        <div class="cp new">pipeline_trigger_id</div>
+        <div class="cp new">pipeline_trigger_time</div>
+        <div class="cp new">pipeline_trigger_type</div>
+      </div>
+    </div>
+    <div class="chain-arrow">→</div>
+
+    <!-- App WF -->
+    <div class="chain-step">
+      <div class="chain-head blue">
+        application_wf
+        <span class="chain-sub">Workflow Pipeline</span>
+      </div>
+      <div class="chain-params">
+        <div class="cp">pipeline_trigger_id</div>
+        <div class="cp">pipeline_trigger_time</div>
+        <div class="cp">pipeline_trigger_type</div>
+        <div class="cp new">pipeline_id</div>
+        <div class="cp new">pipeline_name</div>
+      </div>
+    </div>
+    <div class="chain-arrow">→</div>
+
+    <!-- Coordinator -->
+    <div class="chain-step">
+      <div class="chain-head amber">
+        Coordinator
+        <span class="chain-sub">Routing Pipeline</span>
+      </div>
+      <div class="chain-params">
+        <div class="cp">pipeline_trigger_*</div>
+        <div class="cp">pipeline_id</div>
+        <div class="cp">pipeline_name</div>
+        <div class="cp derived">layer (parsed)</div>
+        <div class="cp derived">datasubject (parsed)</div>
+      </div>
+    </div>
+    <div class="chain-arrow">→</div>
+
+    <!-- Get Config -->
+    <div class="chain-step">
+      <div class="chain-head blue">
+        get_config
+        <span class="chain-sub">Config Pipeline</span>
+      </div>
+      <div class="chain-params">
+        <div class="cp">pipeline_trigger_*</div>
+        <div class="cp">pipeline_id/name</div>
+        <div class="cp new">table_config[ ]</div>
+        <div class="cp new">sequence_number</div>
+      </div>
+    </div>
+    <div class="chain-arrow">→</div>
+
+    <!-- Process Object -->
+    <div class="chain-step">
+      <div class="chain-head blue">
+        process_object
+        <span class="chain-sub">Process Pipeline</span>
+      </div>
+      <div class="chain-params">
+        <div class="cp">pipeline_trigger_*</div>
+        <div class="cp">pipeline_id/name</div>
+        <div class="cp derived">container</div>
+        <div class="cp derived">datasubject</div>
+        <div class="cp derived">sourcesystem</div>
+        <div class="cp derived">tablename</div>
+        <div class="cp derived">file_type</div>
+        <div class="cp derived">ingest_partition</div>
+        <div class="cp derived">bronze_file_format</div>
+        <span style="font-size:9px;color:var(--tx3);margin-top:2px;display:block">from @item() in ForEach</span>
+      </div>
+    </div>
+    <div class="chain-arrow">→</div>
+
+    <!-- Function Pipeline -->
+    <div class="chain-step">
+      <div class="chain-head teal">
+        Function Pipeline
+        <span class="chain-sub">e.g. copy_file_as_is</span>
+      </div>
+      <div class="chain-params">
+        <div class="cp">pipeline_trigger_*</div>
+        <div class="cp">pipeline_id/name</div>
+        <div class="cp">container</div>
+        <div class="cp">datasubject</div>
+        <div class="cp">sourcesystem</div>
+        <div class="cp">tablename</div>
+        <div class="cp">table_id</div>
+        <div class="cp">ingest_channel</div>
+        <div class="cp">ingest_partition</div>
+        <div class="cp">file_type</div>
+        <div class="cp">layer</div>
+        <div class="cp">full_refresh_flag</div>
+      </div>
+    </div>
+    <div class="chain-arrow">→</div>
+
+    <!-- Notebook -->
+    <div class="chain-step">
+      <div class="chain-head green">
+        transform_nbk
+        <span class="chain-sub">Python Notebook</span>
+      </div>
+      <div class="chain-params">
+        <div class="cp">all above</div>
+        <div class="cp">criteria_columns</div>
+        <div class="cp">full_refresh_flag</div>
+        <div class="cp new">bronze_local (built)</div>
+        <div class="cp new">staging_abfss (built)</div>
+        <div class="cp new">silver_fqn (built)</div>
+        <div class="cp new">row_hash (computed)</div>
+        <span style="font-size:9px;color:var(--tx3);margin-top:2px;display:block">Python vars · pyodbc → Warehouse</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chain-legend">
+    <div class="cl-item"><div class="cl-dot" style="background:var(--teal-bg);border:1.5px solid var(--teal-str)"></div>New param — first introduced at this stage</div>
+    <div class="cl-item"><div class="cl-dot" style="background:var(--amber-bg);border:1.5px solid var(--amber-str)"></div>Derived — computed or read from config at this stage</div>
+    <div class="cl-item"><div class="cl-dot" style="background:var(--bg2);border:1px solid var(--bd2)"></div>Pass-through — forwarded unchanged from upstream</div>
+  </div>
+
+  <div class="s-section-num">08</div>
+</section>
+
+
+<!-- ═══════ S9 — DESIGN PRINCIPLES ═══════ -->
+<section id="s9">
+  <div class="s-eyebrow">Design principles</div>
+  <div class="s-title">Built-in guarantees.<br><em>Pipelines orchestrate only.</em></div>
+  <div class="s-sub">No transformation logic lives inside pipeline activities — every piece of data work is in a notebook or stored procedure.</div>
+
+  <div class="props-grid">
+    <div class="prop-card">
+      <div class="prop-icon">🎛️</div>
+      <div class="prop-title">Metadata-Driven</div>
+      <div class="prop-body">Adding a new table requires no pipeline changes — just a new row in <code style="font-family:var(--mono)">elt_table_config</code> with the right <code style="font-family:var(--mono)">bronze_file_format</code>, <code style="font-family:var(--mono)">layer</code>, and source details. The coordinator routes it automatically.</div>
+      <div class="prop-pill blue">Zero pipeline edits</div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-icon">🧮</div>
+      <div class="prop-title">Orchestrate, Don't Transform</div>
+      <div class="prop-body">Fabric Pipeline activities (Copy, ForEach, Switch) only move control flow. All data movement and transformation is delegated to <strong>notebooks</strong> (when data crosses the Lakehouse/Warehouse boundary) or <strong>stored procedures</strong> (when it's warehouse-to-warehouse). Pipeline JSON stays small; logic stays in version-controlled code.</div>
+      <div class="prop-pill teal">Notebooks + SPs do the work</div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-icon">💾</div>
+      <div class="prop-title">Resumable Watermark</div>
+      <div class="prop-body"><code style="font-family:var(--mono)">ingest_partition</code> is updated after each successful partition — not after a full run. A mid-run failure resumes from the last successful partition on the next trigger, with no data re-processed.</div>
+      <div class="prop-pill amber">Per-partition commits</div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-icon">📁</div>
+      <div class="prop-title">Format Preservation</div>
+      <div class="prop-body">File sources land in bronze exactly as they arrived (csv, json, parquet, xml, excel). The <code style="font-family:var(--mono)">file_type</code> is passed to the Python notebook so the right pandas reader is picked — parsing only happens at the bronze→silver stage.</div>
+      <div class="prop-pill green">Bronze = raw truth</div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-icon">🔌</div>
+      <div class="prop-title">Gateway Support Kept</div>
+      <div class="prop-body">The <code style="font-family:var(--mono)">copy_from_sql_to_parquet</code> pipeline uses a Copy activity — the only Fabric component that supports on-premise data gateways. Notebooks cannot reach on-prem directly.</div>
+      <div class="prop-pill purple">On-prem compatible</div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-icon">🔢</div>
+      <div class="prop-title">Sequence-Controlled Ordering</div>
+      <div class="prop-body">The <code style="font-family:var(--mono)">sequence_number</code> column groups tables into batches. Batches run in strict order — higher sequences never start until all lower-sequence tables complete, enabling safe cross-table dependency management.</div>
+      <div class="prop-pill blue">Dependency-aware</div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-icon">🪄</div>
+      <div class="prop-title">Right Tool for the Layer</div>
+      <div class="prop-body"><strong>Notebooks</strong> only appear where data must cross a format boundary — bronze (Lakehouse files) → silver (Warehouse). Once data is inside the Warehouse, silver→gold and gold→platinum use plain <strong>stored procedures</strong>: no pandas roundtrip, no pyodbc, no Entra token plumbing — just T-SQL the Warehouse runs natively.</div>
+      <div class="prop-pill purple">SP for warehouse-internal</div>
+    </div>
+  </div>
+  <div class="s-section-num">09</div>
+</section>
+
+
+<!-- ── FOOTER ── -->
+<div id="footer-section">
+  <p>
+    Fabric ELT Pipeline · Medallion Architecture · Microsoft Fabric<br>
+    <code style="font-family:var(--mono)">elt_table_config</code> · <code style="font-family:var(--mono)">bronze_file_format</code> switch · Python notebook for B2S · T-SQL stored procs for S2G+ · Warehouse SCD2 · Resumable watermark
+  </p>
+</div>
+
+
+<!-- ── NODE MODAL ── -->
+<div id="node-modal" onclick="if(event.target===this)closeModal()">
+  <div id="modal-card">
+    <div id="modal-head">
+      <div id="modal-head-left">
+        <div id="modal-type" class="tt-type blue"></div>
+        <div id="modal-title"></div>
+        <div id="modal-file"></div>
+      </div>
+      <button id="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body">
+      <div id="modal-acts">
+        <div class="mc-label">Activities</div>
+        <div id="modal-acts-content"></div>
+      </div>
+      <div id="modal-params">
+        <div class="mc-label">Parameters</div>
+        <div id="modal-params-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════ TOOLTIP DATA ═══════════ */
+const TOOLTIPS = {
+  'fn-app-s2b': {
+    type:'Workflow Pipeline', color:'blue',
+    title:'src2brz_application_wf',
+    body:'Entry point for the bronze ingestion layer. Triggered by a Fabric schedule. Calls Coordinator with pipeline_name, trigger metadata, and a self-referencing pipeline_id.',
+    acts:[
+      {icon:'▶', text:'Invoke Coordinator with pipeline_name = "src2brz_application_sqlvm_prd01_wf"'},
+      {icon:'→', text:'Passes: pipeline_id, pipeline_name, pipeline_trigger_id, trigger_time, trigger_type'},
+    ]
+  },
+  'fn-app-b2s': {
+    type:'Workflow Pipeline', color:'teal',
+    title:'bronze2silver_application_wf',
+    body:'Entry point for the silver transformation layer. Same pattern as src2brz_wf — only the pipeline_name differs, which Coordinator uses to determine the layer.',
+    acts:[
+      {icon:'▶', text:'Invoke Coordinator with pipeline_name = "bronze2silver_application_sqlvm_prd01_wf"'},
+      {icon:'→', text:'Passes same trigger metadata to Coordinator'},
+    ]
+  },
+  'fn-coord': {
+    type:'Routing Pipeline', color:'amber',
+    title:'Coordinator',
+    body:'Parses the layer (e.g. "src2brz") and datasubject from the pipeline_name string. Uses a Switch activity to invoke the correct get_config pipeline.',
+    acts:[
+      {icon:'⚙', text:'Switch on layer parsed from pipeline_name'},
+      {icon:'→', text:'src2brz → src2brz_get_config'},
+      {icon:'→', text:'bronze2silver → bronze2silver_get_config'},
+      {icon:'→', text:'silver2gold → silver2gold_get_config (planned — SP-based, warehouse-internal)'},
+    ]
+  },
+  'fn-s2b-cfg': {
+    type:'Config Pipeline', color:'blue',
+    title:'src2brz_get_config',
+    body:'Queries elt_table_config for all active tables matching the layer and datasubject. Gets distinct sequence_number values, then calls process_object once per sequence — passing the full config array each time.',
+    acts:[
+      {icon:'🔍', text:'Lookup: SELECT * FROM elt_table_config WHERE layer=\'bronze\' AND datasubject=…'},
+      {icon:'🔍', text:'Lookup: SELECT DISTINCT sequence_number ORDER BY sequence_number ASC'},
+      {icon:'🔁', text:'ForEach sequence_number (isSequential: true)'},
+      {icon:'→', text:'Invoke src2brz_process_object with table_config[] + sequence_number'},
+    ]
+  },
+  'fn-b2s-cfg': {
+    type:'Config Pipeline', color:'teal',
+    title:'bronze2silver_get_config',
+    body:'Same orchestration pattern as src2brz_get_config. Queries for layer=\'bronze2silver\' tables and dispatches to bronze2silver_process_object per sequence.',
+    acts:[
+      {icon:'🔍', text:'Lookup: SELECT * FROM elt_table_config WHERE layer=\'silver\''},
+      {icon:'🔁', text:'ForEach distinct sequence_number (sequential)'},
+      {icon:'→', text:'Invoke bronze2silver_process_object'},
+    ]
+  },
+  'fn-sil-cfg': {
+    type:'Config Pipeline (planned)', color:'purple',
+    title:'silver2gold_get_config',
+    body:'Same 2-Lookup + ForEach pattern as the other get_config pipelines. Queries elt_table_config for layer="gold" and dispatches per sequence_number to silver2gold_process_object.',
+    acts:[
+      {icon:'🔍', text:'Lookup: SELECT * FROM elt_table_config WHERE layer=\'gold\''},
+      {icon:'🔍', text:'Lookup: SELECT DISTINCT sequence_number ORDER BY sequence_number'},
+      {icon:'🔁', text:'ForEach sequence_number (isSequential: true)'},
+      {icon:'→', text:'Invoke silver2gold_process_object with table_config[] + sequence_number'},
+      {icon:'✓', text:'Coordinator Switch case already wired up'},
+    ]
+  },
+  'fn-s2b-obj': {
+    type:'Process Pipeline', color:'blue',
+    title:'src2brz_process_object',
+    body:'Receives the full table_config array and a target sequence_number. Filters to matching tables. ForEach with NO isSequential — tables in the same sequence run in parallel.',
+    acts:[
+      {icon:'⚡', text:'Filter: @equals(item().sequence_number, pipeline().parameters.sequence_number)'},
+      {icon:'🔁', text:'ForEach filtered tables (parallel — no isSequential flag)'},
+      {icon:'⚙', text:'Switch on item().bronze_file_format'},
+      {icon:'→', text:'sap_table → copy_from_sap_to_parquet'},
+      {icon:'→', text:'csv/parquet/json/excel → copy_file_as_is'},
+      {icon:'→', text:'sharepoint_list → copy_sharepoint_list_to_parquet'},
+    ]
+  },
+  'fn-b2s-obj': {
+    type:'Process Pipeline', color:'teal',
+    title:'bronze2silver_process_object',
+    body:'Same filter-and-dispatch pattern for the silver layer. ForEach with isSequential: true — tables within a sequence run one at a time. Passes file_type downstream.',
+    acts:[
+      {icon:'⚡', text:'Filter: @equals(item().sequence_number, pipeline().parameters.sequence_number)'},
+      {icon:'🔁', text:'ForEach filtered tables (isSequential: TRUE)'},
+      {icon:'→', text:'Invoke bronze2silver_refresh_warehouse_table with file_type, criteria_columns, full_refresh_flag from @item()'},
+    ]
+  },
+  'fn-switch': {
+    type:'Switch Activity (inside process_object)', color:'blue',
+    title:'Switch on bronze_file_format',
+    body:'Reads bronze_file_format from the current ForEach item. Routes to the appropriate ingestion pipeline. The default case is a no-op.',
+    acts:[
+      {icon:'🔀', text:'sap_table → copy_from_sap_to_parquet (SAP RFC/OData)'},
+      {icon:'🔀', text:'csv → copy_file_as_is (binary)'},
+      {icon:'🔀', text:'parquet → copy_file_as_is (binary)'},
+      {icon:'🔀', text:'json → copy_file_as_is (binary)'},
+      {icon:'🔀', text:'excel → copy_file_as_is (binary)'},
+      {icon:'🔀', text:'sharepoint_list → copy_sharepoint_list_to_parquet (Graph API)'},
+      {icon:'🔀', text:'sap_table → copy_from_sap_to_parquet (SAP RFC/OData)'},
+      {icon:'⬜', text:'(default) → no-op'},
+    ]
+  },
+  'fn-refresh': {
+    type:'Function Pipeline', color:'teal',
+    title:'bronze2silver_refresh_warehouse_table',
+    body:'Core of the silver processing loop. Lists bronze partitions for this table, filters to only those newer than the watermark, sorts them ascending, and processes each one with the Python notebook. After the transform, the DQ notebook runs in parallel with the watermark update.',
+    acts:[
+      {icon:'📋', text:'GetMetadata: childItems from Files/bronze/…/ingest_channel/ folder'},
+      {icon:'⚡', text:'Filter: replace(item().name,\'ingest_partition=\',\'\') > pipeline().parameters.ingest_partition'},
+      {icon:'↕', text:'Lookup (OPENJSON in Warehouse): ORDER BY [name] ASC to sort partition names'},
+      {icon:'🔁', text:'ForEach partition (isSequential: true)'},
+      {icon:'→', text:'TridentNotebook: bronze2silver_transform_nbk'},
+      {icon:'→', text:'TridentNotebook: bronze2silver_dq_nbk  (depends on transform_nbk — runs in parallel with SP)'},
+      {icon:'→', text:'StoredProcedure: update_load_status (advances watermark — depends on transform_nbk)'},
+    ]
+  },
+  'fn-file-copy': {
+    type:'Function Pipeline (new)', color:'teal',
+    title:'src2brz_copy_file_as_is',
+    body:'Binary Copy — moves a file from the Lakehouse landing folder to the bronze partition without any format conversion. The original file lands in bronze exactly as it was.',
+    acts:[
+      {icon:'📂', text:'Source: Files/{custom_source_path}/{sourcetablename} in Lakehouse'},
+      {icon:'📁', text:'Sink: Files/bronze/…/{ingest_channel}/{trigger_hour}/ in Lakehouse'},
+      {icon:'💾', text:'StoredProcedure: update_load_status with last_ingest_partition = trigger_hour'},
+    ]
+  },
+  'fn-nbk': {
+    type:'Notebook — Python only', color:'teal',
+    title:'bronze2silver_transform_nbk',
+    body:'Pure Python (no PySpark, no %%sql). Reads the bronze file in its native format with pandas/pyarrow, stages a parquet, then COPY INTO + SCD Type 2 merge against a Fabric Warehouse silver table via pyodbc.',
+    acts:[
+      {icon:'🐍', text:'pandas/pyarrow: read_parquet | read_csv | read_json | read_xml | read_excel'},
+      {icon:'🔐', text:'Compute SHA-256 row_hash over business columns (SCD2 change detection)'},
+      {icon:'📦', text:'Stage as parquet → Files/_staging/ in Lakehouse'},
+      {icon:'🔑', text:'pyodbc + DefaultAzureCredential token → Fabric Warehouse'},
+      {icon:'📥', text:'COPY INTO [silver].[tbl]__stg FROM abfss://… WITH FILE_TYPE=PARQUET'},
+      {icon:'🔄', text:'SCD2 merge: close stale rows (row_hash changed), insert new versions + brand-new keys'},
+      {icon:'✅', text:'After success: caller pipeline calls update_load_status SP to advance watermark'},
+    ]
+  },
+  'fn-dq-nbk': {
+    title:'bronze2silver_dq_nbk', file:'bronze2silver_dq_nbk.ipynb',
+    type:'Python Notebook — no PySpark', color:'teal',
+    body:'Runs after bronze2silver_transform_nbk has written data to the silver table. Reads active DQ rules from elt_dq_config, queries the current silver rows (is_current = 1), evaluates each rule, and writes one result row per rule into elt_dq_results. DQ failure does not block the watermark update — it is a monitoring notebook, not a gate.',
+    acts:[
+      {icon:'🐍', text:'Cell 3 — Fetch active rules: SELECT … FROM elt_dq_config WHERE table_id = ? AND is_active = 1'},
+      {icon:'🐍', text:'Cell 4 — Load silver rows: SELECT * FROM [silver].[tablename] WHERE is_current = 1'},
+      {icon:'🐍', text:'Cell 5 — Evaluate rules: not_null | allowed_values | range | regex → collect (fail_count, total_count, pass_rate)'},
+      {icon:'💾', text:'Cell 6 — INSERT results into mdf_platform_orchestration.elt_dq_results (one row per rule per run)'},
+    ],
+    sampleOutput:`<span class="so-h">Cell 3  Fetch DQ rules</span>
+queried elt_dq_config WHERE table_id = '38' AND is_active = 1
+→ 2 rules loaded for [silver].[systemparameters]
+
+<span class="so-h">Cell 4  Load silver rows</span>
+SELECT * FROM [silver].[systemparameters] WHERE is_current = 1
+→ <span class="so-val">1 row loaded</span>
+
+<span class="so-h">Cell 5  Evaluate rules</span>
+  rule 1 [not_null]       DeliveryMethodName: <span class="so-ok">PASS</span>  pass_rate=100.0%
+  rule 2 [allowed_values] LastEditedBy: <span class="so-ok">PASS</span>  pass_rate=100.0%
+rules evaluated: 2
+
+<span class="so-h">Cell 6  Write results</span>
+INSERT 2 rows into mdf_platform_orchestration.elt_dq_results
+print: <span class="so-ok">{"status":"SUCCESS","table":"systemparameters","rules_checked":2,"failures":0,"run_id":"4f2b8c1a-..."}</span>`
+  },
+  'fn-sil-obj': {
+    type:'Process Pipeline (planned)', color:'purple',
+    title:'silver2gold_process_object',
+    body:'Filters table_config to the current sequence_number, then ForEach → SqlServerStoredProcedure. No notebook needed — silver and gold both live in the Warehouse, so the transform is pure T-SQL inside a stored procedure.',
+    acts:[
+      {icon:'⚡', text:'Filter: @equals(item().sequence_number, pipeline().parameters.sequence_number)'},
+      {icon:'🔁', text:'ForEach filtered tables'},
+      {icon:'💾', text:'SqlServerStoredProcedure: [mdf_platform_orchestration].[update_load_status]  (plus per-table transform SP)'},
+    ]
+  },
+  'fn-sil-sp': {
+    type:'Stored Procedure · T-SQL', color:'purple',
+    title:'silver→gold stored procedure',
+    body:'All silver→gold logic lives inside the Warehouse as T-SQL. Joins silver SCD2 tables (is_current = 1 for point-in-time), aggregates, writes to [gold].* dim/fact tables, then calls update_load_status. No data leaves the Warehouse.',
+    acts:[
+      {icon:'🔗', text:'JOIN across [silver].* tables WHERE is_current = 1'},
+      {icon:'📊', text:'Aggregations / surrogate keys / dimensional conforming'},
+      {icon:'📥', text:'INSERT or MERGE into [gold].[dim_*] / [gold].[fact_*]'},
+      {icon:'💾', text:'CALL [update_load_status] to advance watermark'},
+      {icon:'⚡', text:'Zero Python, zero pyodbc — Warehouse executes natively'},
+    ]
+  },
+};
+
+/* ═══════ FLOW GRAPH ═══════ */
+const nodePos = {
+  'fn-app-s2b':   {x:0,   y:52,  w:148, h:52},
+  'fn-app-b2s':   {x:0,   y:192, w:148, h:52},
+  'fn-coord':     {x:192, y:128, w:118, h:52},
+  'fn-s2b-cfg':   {x:358, y:52,  w:152, h:52},
+  'fn-b2s-cfg':   {x:358, y:192, w:152, h:52},
+  'fn-sil-cfg':   {x:358, y:310, w:152, h:52},
+  'fn-s2b-obj':   {x:554, y:52,  w:152, h:52},
+  'fn-b2s-obj':   {x:554, y:192, w:152, h:52},
+  'fn-sil-obj':   {x:554, y:310, w:152, h:52},
+  'fn-switch':    {x:754, y:20,  w:118, h:52},
+  'fn-refresh':   {x:754, y:192, w:152, h:52},
+  'fn-sap':       {x:920, y:0,   w:156, h:52},
+  'fn-file-copy': {x:920, y:64,  w:156, h:52},
+  'fn-sp-list':   {x:920, y:128, w:156, h:52},
+  'fn-nbk':       {x:920, y:192, w:156, h:52},
+  'fn-dq-nbk':   {x:1096, y:192, w:152, h:52},
+  'fn-sil-sp':    {x:920, y:310, w:156, h:52},
+};
+const EDGES = [
+  {id:'e1',  from:'fn-app-s2b', to:'fn-coord',     routes:['db','file','sp']},
+  {id:'e2',  from:'fn-app-b2s', to:'fn-coord',     routes:['b2s']},
+  {id:'e3',  from:'fn-coord',   to:'fn-s2b-cfg',   routes:['db','file','sp']},
+  {id:'e4',  from:'fn-coord',   to:'fn-b2s-cfg',   routes:['b2s']},
+  {id:'e5',  from:'fn-coord',   to:'fn-sil-cfg',   routes:['sil']},
+  {id:'e6',  from:'fn-s2b-cfg', to:'fn-s2b-obj',   routes:['db','file','sp']},
+  {id:'e7',  from:'fn-b2s-cfg', to:'fn-b2s-obj',   routes:['b2s']},
+  {id:'e8',  from:'fn-s2b-obj', to:'fn-switch',    routes:['db','file','sp']},
+  {id:'e9',  from:'fn-b2s-obj', to:'fn-refresh',   routes:['b2s']},
+  {id:'e10', from:'fn-switch',  to:'fn-sap',       routes:['db']},
+  {id:'e11', from:'fn-switch',  to:'fn-file-copy', routes:['file']},
+  {id:'e16', from:'fn-switch',  to:'fn-sp-list',   routes:['sp']},
+  {id:'e12', from:'fn-refresh', to:'fn-nbk',       routes:['b2s']},
+  {id:'e15', from:'fn-nbk',    to:'fn-dq-nbk',    routes:['b2s']},
+  {id:'e13', from:'fn-sil-cfg', to:'fn-sil-obj',   routes:['sil']},
+  {id:'e14', from:'fn-sil-obj', to:'fn-sil-sp',    routes:['sil']},
+];
+const NODES_ROUTES = {
+  'fn-app-s2b':['db','file','sp'], 'fn-app-b2s':['b2s'],
+  'fn-coord':['db','file','sp','b2s','sil'],
+  'fn-s2b-cfg':['db','file','sp'], 'fn-b2s-cfg':['b2s'], 'fn-sil-cfg':['sil'],
+  'fn-s2b-obj':['db','file','sp'], 'fn-b2s-obj':['b2s'], 'fn-sil-obj':['sil'],
+  'fn-switch':['db','file','sp'],  'fn-refresh':['b2s'],
+  'fn-sap':['db'], 'fn-file-copy':['file'], 'fn-sp-list':['sp'],
+  'fn-nbk':['b2s'], 'fn-dq-nbk':['b2s'], 'fn-sil-sp':['sil'],
+};
+
+function rc(id){const n=nodePos[id];return[n.x+n.w,n.y+n.h/2]}
+function lc(id){const n=nodePos[id];return[n.x,n.y+n.h/2]}
+
+function buildPaths(){
+  const svg=document.getElementById('flow-svg');
+  EDGES.forEach(e=>{
+    const [x1,y1]=rc(e.from);
+    const [x2,y2]=lc(e.to);
+    const mx=(x1+x2)/2;
+    const d=`M ${x1},${y1} C ${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',d); p.setAttribute('class','fp');
+    p.setAttribute('marker-end','url(#arr-gray)');
+    p.id='ep-'+e.id; p.dataset.routes=e.routes.join(' ');
+    svg.appendChild(p);
+  });
+}
+
+let currentRoute=null;
+function setRoute(r){
+  currentRoute=r;
+  ['none','db','file','sp','b2s','sil'].forEach(id=>{
+    const b=document.getElementById('rb-'+id);
+    if(b) b.classList.toggle('active',(r===null&&id==='none')||r===id);
+  });
+  Object.keys(NODES_ROUTES).forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.classList.remove('hl-db','hl-file','hl-sp','hl-b2s','hl-sil');
+    if(r&&NODES_ROUTES[id].includes(r)) el.classList.add('hl-'+r);
+  });
+  EDGES.forEach(e=>{
+    const el=document.getElementById('ep-'+e.id);
+    if(!el) return;
+    el.classList.remove('hl-db','hl-file','hl-sp','hl-b2s','hl-sil','dim');
+    if(r===null){el.setAttribute('marker-end','url(#arr-gray)');}
+    else if(e.routes.includes(r)){el.classList.add('hl-'+r);el.setAttribute('marker-end','url(#arr-'+r+')');}
+    else{el.classList.add('dim');el.setAttribute('marker-end','url(#arr-gray)');}
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   NODE DETAIL DATA (from actual pipeline JSONs)
+   ════════════════════════════════════════════════ */
+const NODE_DETAILS = {
+  'fn-app-s2b': {
+    title:'src2brz_application_sqlvm_prd01_wf', file:'src2brz_application_sqlvm_prd01_wf.json',
+    type:'Workflow Pipeline', color:'blue',
+    sampleOutput:`<span class="so-h">── Trigger ────────────────────────────────</span>
+Type          : ScheduleTrigger
+Trigger time  : <span class="so-val">2025-10-15T06:00:00Z</span>
+Trigger ID    : trig-7a3f...
+pipeline_name : <span class="so-val">"src2brz_application_sqlvm_prd01_wf"</span>
+  ↳ Coordinator reads split("_")[0] = <span class="so-val">"src2brz"</span>  → routes to get_config
+
+<span class="so-h">── CallToMainFunctionPipeline ─────────────</span>
+Invoked : coordinator  (bfdaa752-...)
+Wait    : waitOnCompletion = true
+
+Pipeline run ID : <span class="so-val">4f2b8c1a-9d12-4e7b-8c30-1a2b3c4d5e6f</span>
+<span class="so-ok">Pipeline run: Succeeded  (coordinator returned Succeeded)</span>`,
+    activities:[{
+      badge:'Invoke', badgeColor:'gray', name:'CallToMainFunctionPipeline',
+      details:[
+        {l:'Calls',v:'coordinator  (bfdaa752-ed98-4902-bbfa-7de4177bbefd)'},
+        {l:'Wait',v:'waitOnCompletion: true'},
+        {l:'pipeline_id',v:'@pipeline().Pipeline'},
+        {l:'pipeline_name',v:'@pipeline().PipelineName  ← Coordinator splits on "_" to get layer'},
+        {l:'pipeline_run_id',v:'@pipeline().RunId'},
+        {l:'trigger_id',v:'pipeline().TriggerId'},
+        {l:'trigger_time',v:'@pipeline().TriggerTime'},
+        {l:'trigger_type',v:'@pipeline().TriggerType'},
+      ]
+    }],
+    params:[]
+  },
+  'fn-app-b2s': {
+    title:'bronze2silver_application_sqlvm_prd01_wf', file:'bronze2silver_application_sqlvm_prd01_wf.json',
+    type:'Workflow Pipeline', color:'teal',
+    sampleOutput:`<span class="so-h">── Trigger ────────────────────────────────</span>
+Type          : ScheduleTrigger
+Trigger time  : <span class="so-val">2025-10-15T07:00:00Z</span>
+pipeline_name : <span class="so-val">"bronze2silver_application_sqlvm_prd01_wf"</span>
+  ↳ Coordinator reads split("_")[0] = <span class="so-val">"bronze2silver"</span>  → routes to b2s get_config
+
+<span class="so-h">── CallToMainFunctionPipeline ─────────────</span>
+Invoked : coordinator  (bfdaa752-...)
+Wait    : waitOnCompletion = true
+
+<span class="so-ok">Pipeline run: Succeeded</span>`,
+    activities:[{
+      badge:'Invoke', badgeColor:'gray', name:'CallToMainFunctionPipeline',
+      details:[
+        {l:'Calls',v:'coordinator  (bfdaa752-ed98-4902-bbfa-7de4177bbefd)'},
+        {l:'Wait',v:'waitOnCompletion: true'},
+        {l:'pipeline_name',v:'@pipeline().PipelineName  ← "bronze2silver_..." → Coordinator routes to B2S'},
+        {l:'All params',v:'Same pattern as src2brz_application_wf — reads from pipeline() system vars'},
+      ]
+    }],
+    params:[]
+  },
+  'fn-coord': {
+    title:'coordinator', file:'coordinator.json',
+    type:'Routing Pipeline', color:'amber',
+    sampleOutput:`<span class="so-h">── Switch on layer ────────────────────────</span>
+pipeline_name : <span class="so-val">"src2brz_application_sqlvm_prd01_wf"</span>
+split("_")[0] : <span class="so-val">"src2brz"</span>
+
+Matched case  : <span class="so-val">src2brz</span>
+  → InvokePipeline: src2brz_get_config  (90da4937-...)
+  → waitOnCompletion: true
+
+<span class="so-ok">Coordinator: Succeeded  (passed through, no data transformation)</span>`,
+    activities:[{
+      badge:'Switch', badgeColor:'amber', name:'SwitchByLayer',
+      details:[
+        {l:'On',v:"@split(pipeline().parameters.pipeline_name,'_')[0]",isCode:true},
+        {l:'Derivation',v:'First token of pipeline_name when split by "_"  →  layer string'},
+        {l:'Case src2brz',v:'InvokePipeline → src2brz_get_config  (90da4937-c6e7-49b4-8735-bf60869fdd40)'},
+        {l:'Case bronze2silver',v:'InvokePipeline → bronze2silver_get_config  (ac8913d1-ce73-4a76-adca-2663858f287c)'},
+        {l:'Case silver2gold',v:'InvokePipeline → silver2gold_get_config  (7119f6f8-d47f-4153-be55-06736ca5a76f)  [planned]'},
+        {l:'Default',v:'(no-op — empty activities array)'},
+        {l:'All cases pass',v:'pipeline_id, pipeline_name, pipeline_run_id, pipeline_trigger_id, pipeline_trigger_time, pipeline_trigger_type'},
+      ]
+    }],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+    ]
+  },
+  'fn-s2b-cfg': {
+    title:'src2brz_get_config', file:'src2brz_get_config.json',
+    type:'Config Pipeline', color:'blue',
+    sampleOutput:`<span class="so-h">activity: Get Sequence Nbr</span>
+output.value: [
+  { <span class="so-val">"sequence_number": 10</span> },
+  { <span class="so-val">"sequence_number": 20</span> },
+  { <span class="so-val">"sequence_number": 30</span> },
+  { <span class="so-val">"sequence_number": 40</span> }
+]
+
+<span class="so-h">activity: Get Config Information</span>
+output.value: [
+  { "table_id":1, "tablename":<span class="so-val">"cities"</span>,          "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":2, "tablename":<span class="so-val">"countries"</span>,       "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":3, "tablename":<span class="so-val">"deliverymethods"</span>,  "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":4, "tablename":<span class="so-val">"paymentmethods"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":5, "tablename":<span class="so-val">"people"</span>,           "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":6, "tablename":<span class="so-val">"stateprovinces"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":7, "tablename":<span class="so-val">"systemparameters"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"0", "criteria_columns":"LastEditedWhen" },
+  { "table_id":8, "tablename":<span class="so-val">"transactiontypes"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         }
+]
+
+<span class="so-h">ForEach Sequence Nbr (isSequential: true)</span>
+  [1/4] { "sequence_number": 10 } → invoke process_object → <span class="so-ok">Succeeded</span>  (2 tables · 18s)
+  [2/4] { "sequence_number": 20 } → invoke process_object → <span class="so-ok">Succeeded</span>  (2 tables · 15s)
+  [3/4] { "sequence_number": 30 } → invoke process_object → <span class="so-ok">Succeeded</span>  (2 tables · 20s)
+  [4/4] { "sequence_number": 40 } → invoke process_object → <span class="so-ok">Succeeded</span>  (2 tables · 17s)
+
+<span class="so-ok">Pipeline run: Succeeded  (total 1m 10s)</span>`,
+    activities:[
+      {
+        badge:'Lookup', badgeColor:'blue', name:'Get Sequence Nbr  (parallel — no dependsOn)',
+        details:[
+          {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
+          {l:'SQL',v:"SELECT [sequence_number]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND   [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'\nGROUP BY [sequence_number]\nORDER BY [sequence_number]",isCode:true},
+          {l:'firstRowOnly',v:'false — returns all distinct sequence numbers as array'},
+        ]
+      },
+      {
+        badge:'Lookup', badgeColor:'blue', name:'Get Config Information  (parallel — no dependsOn)',
+        details:[
+          {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
+          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[bronze_file_type]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
+          {l:'firstRowOnly',v:'false — returns full config row array (passed as table_config to process_object)'},
+        ]
+      },
+      {
+        badge:'ForEach', badgeColor:'teal', name:'ForEach Sequence Nbr', sequential:true,
+        details:[
+          {l:'Items',v:"@activity('Get Sequence Nbr').output.value",isCode:true},
+          {l:'Mode',v:'isSequential: true — one sequence number at a time'},
+          {l:'Depends on',v:'Both Lookups must succeed before ForEach starts'},
+        ],
+        nested:[{
+          badge:'Invoke', badgeColor:'gray', name:'Process tables on each sequence nbr → src2brz_process_object  (28b351ba-...)',
+          details:[
+            {l:'table_config',v:"@activity('Get Config Information').output.value  ← full array",isCode:true},
+            {l:'sequence_number',v:'@item().sequence_number  ← current iteration value',isCode:true},
+            {l:'waitOnCompletion',v:'true — waits for all tables in sequence to finish before next iteration'},
+          ]
+        }]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+    ]
+  },
+  'fn-b2s-cfg': {
+    title:'bronze2silver_get_config', file:'bronze2silver_get_config.json',
+    type:'Config Pipeline', color:'teal',
+    sampleOutput:`<span class="so-h">activity: Get Sequence Nbr</span>
+output.value: [
+  { <span class="so-val">"sequence_number": 10</span> },
+  { <span class="so-val">"sequence_number": 20</span> },
+  { <span class="so-val">"sequence_number": 30</span> },
+  { <span class="so-val">"sequence_number": 40</span> }
+]
+
+<span class="so-h">activity: Get Config Information</span>
+output.value: [
+  { "table_id":32, "tablename":<span class="so-val">"cities"</span>,          "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":1,  "ingest_partition":"1900-00-00-00", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":33, "tablename":<span class="so-val">"countries"</span>,       "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":2,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":34, "tablename":<span class="so-val">"deliverymethods"</span>,  "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":3,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":35, "tablename":<span class="so-val">"paymentmethods"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":4,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":36, "tablename":<span class="so-val">"people"</span>,           "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":5,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":37, "tablename":<span class="so-val">"stateprovinces"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":6,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
+  { "table_id":38, "tablename":<span class="so-val">"systemparameters"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":7,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"0", "criteria_columns":"LastEditedWhen" },
+  { "table_id":39, "tablename":<span class="so-val">"transactiontypes"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":8,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         }
+]
+
+<span class="so-h">ForEach Sequence Nbr (isSequential: true)</span>
+  [1/4] { "sequence_number": 10 } → invoke process_object → <span class="so-ok">Succeeded</span>  (2 tables · 3m 02s)
+  [2/4] { "sequence_number": 20 } → invoke process_object → <span class="so-ok">Succeeded</span>  (2 tables · 2m 41s)
+  [3/4] { "sequence_number": 30 } → invoke process_object → <span class="so-ok">Succeeded</span>  (2 tables · 5m 18s)
+  [4/4] { "sequence_number": 40 } → invoke process_object → <span class="so-ok">Succeeded</span>  (2 tables · 4m 09s)
+
+<span class="so-ok">Pipeline run: Succeeded  (total 15m 10s)</span>`,
+    activities:[
+      {
+        badge:'Lookup', badgeColor:'blue', name:'Get Sequence Nbr  (parallel)',
+        details:[
+          {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
+          {l:'SQL',v:"SELECT [sequence_number]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND   [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'\nGROUP BY [sequence_number]\nORDER BY [sequence_number]",isCode:true},
+        ]
+      },
+      {
+        badge:'Lookup', badgeColor:'blue', name:'Get Config Information  (parallel)',
+        details:[
+          {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
+          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[bronze_file_type]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
+        ]
+      },
+      {
+        badge:'ForEach', badgeColor:'teal', name:'ForEach Sequence Nbr', sequential:true,
+        details:[
+          {l:'Items',v:"@activity('Get Sequence Nbr').output.value",isCode:true},
+          {l:'Mode',v:'isSequential: true'},
+          {l:'Depends on',v:'Both Lookups succeed first'},
+        ],
+        nested:[{
+          badge:'Invoke', badgeColor:'gray', name:'Process tables on each sequence nbr → bronze2silver_process_object  (562d89ea-...)',
+          details:[
+            {l:'table_config',v:"@activity('Get Config Information').output.value",isCode:true},
+            {l:'sequence_number',v:'@item().sequence_number',isCode:true},
+          ]
+        }]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+    ]
+  },
+  'fn-sil-cfg': {
+    title:'silver2gold_get_config', file:'(planned — follows legacy SILVER2GOLD pattern)',
+    type:'Config Pipeline (planned)', color:'purple',
+    activities:[
+      {
+        badge:'Lookup', badgeColor:'blue', name:'Get Sequence Nbr  (parallel)',
+        details:[
+          {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
+          {l:'SQL',v:"SELECT [sequence_number]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND   [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'\nGROUP BY [sequence_number]\nORDER BY [sequence_number]",isCode:true},
+        ]
+      },
+      {
+        badge:'Lookup', badgeColor:'blue', name:'Get Config Information  (parallel)',
+        details:[
+          {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
+          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[bronze_file_type]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
+        ]
+      },
+      {
+        badge:'ForEach', badgeColor:'teal', name:'ForEach Sequence Nbr', sequential:true,
+        details:[
+          {l:'Items',v:"@activity('Get Sequence Nbr').output.value",isCode:true},
+          {l:'Mode',v:'isSequential: true'},
+        ],
+        nested:[{
+          badge:'Invoke', badgeColor:'gray', name:'→ silver2gold_process_object',
+          details:[
+            {l:'table_config',v:"@activity('Get Config Information').output.value",isCode:true},
+            {l:'sequence_number',v:'@item().sequence_number',isCode:true},
+          ]
+        }]
+      },
+      {
+        badge:'Wired', badgeColor:'purple', name:'Already reserved in coordinator',
+        details:[
+          {l:'PipelineId',v:'7119f6f8-d47f-4153-be55-06736ca5a76f'},
+          {l:'Switch case',v:'"silver2gold" in coordinator.json is live'},
+        ]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+    ]
+  },
+  'fn-sil-obj': {
+    title:'silver2gold_process_object', file:'(planned — mirrors legacy SILVER2GOLD/process_object.json)',
+    type:'Process Pipeline (planned)', color:'purple',
+    activities:[
+      {
+        badge:'Filter', badgeColor:'amber', name:'Filter Tables by Sequence Number',
+        details:[
+          {l:'Items',v:'@pipeline().parameters.table_config',isCode:true},
+          {l:'Condition',v:'@equals(item().sequence_number, pipeline().parameters.sequence_number)',isCode:true},
+        ]
+      },
+      {
+        badge:'ForEach', badgeColor:'teal', name:'Process Each Table', sequential:false,
+        details:[
+          {l:'Items',v:"@activity('Filter Tables by Sequence Number').output.value",isCode:true},
+          {l:'Mode',v:'No isSequential — tables in same sequence run in parallel (SPs are warehouse-internal)'},
+        ],
+        nested:[{
+          badge:'SP', badgeColor:'purple', name:'Call to main proc  (warehouse-internal T-SQL)',
+          details:[
+            {l:'Stored Procedure',v:'[mdf_platform_orchestration].[update_load_status]  (legacy pattern: SP name comes from config / or one proc per gold table)'},
+            {l:'Why SP, not notebook',v:'Silver and gold both live in the Warehouse — a stored proc does the JOIN + INSERT natively in T-SQL. No pandas roundtrip, no pyodbc, no Entra token plumbing.'},
+            {l:'Linked service',v:'MDF_WAREHOUSE_DEV_001  (same Warehouse as Lookups)'},
+          ]
+        }]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+      {n:'table_config',t:'array'},{n:'sequence_number',t:'int'},
+    ]
+  },
+  'fn-sil-sp': {
+    title:'silver → gold stored procedure', file:'CONFIG_DATA/STORED_PROCEDURE/*.sql  (planned)',
+    type:'Stored Procedure · T-SQL', color:'purple',
+    activities:[
+      {
+        badge:'SP', badgeColor:'purple', name:'Warehouse-internal transform',
+        details:[
+          {l:'Runs in',v:'Fabric Data Warehouse (MDF_WAREHOUSE_DEV_001)'},
+          {l:'Invoked by',v:'silver2gold_process_object → SqlServerStoredProcedure activity'},
+          {l:'Pattern',v:'JOIN across [silver].* tables (is_current = 1 for point-in-time), aggregate / add surrogate keys, INSERT or MERGE into [gold].*'},
+          {l:'Example SQL',v:"MERGE INTO [gold].[dim_customer] AS t\nUSING (\n    SELECT s.customer_id, s.name, s.country, s.valid_from\n    FROM [silver].[customer] s\n    WHERE s.is_current = 1\n) AS src\nON t.customer_id = src.customer_id\nWHEN MATCHED AND t.row_hash <> HASHBYTES('SHA2_256', ...) THEN UPDATE SET ...\nWHEN NOT MATCHED THEN INSERT (...) VALUES (...);\n\nEXEC [mdf_platform_orchestration].[update_load_status] @table_id = @table_id;",isCode:true},
+          {l:'Why this is simpler than a notebook',v:'Zero data movement, zero Python session spin-up, zero pyodbc auth. Debuggable directly in the Warehouse SQL editor.'},
+        ]
+      }
+    ],
+    params:[]
+  },
+  'fn-s2b-obj': {
+    title:'src2brz_process_object', file:'src2brz_process_object.json',
+    type:'Process Pipeline', color:'blue',
+    sampleOutput:`<span class="so-h">activity: Filter Tables by Sequence Number</span>
+input.items:     output.value from Get Config Information  (8 rows)
+input.condition: @equals(item().sequence_number, 10)
+output: {
+  "itemsCount": 8,
+  "filterCount": 2,
+  "value": [
+    { "table_id":1, "tablename":<span class="so-val">"cities"</span>,    "bronze_file_format":"parquet_none_header", "sequence_number":10, "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "full_refresh_flag":"1" },
+    { "table_id":2, "tablename":<span class="so-val">"countries"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":10, "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "full_refresh_flag":"1" }
+  ]
+}
+
+<span class="so-h">ForEach Process Each Table (parallel — no isSequential)</span>
+  @item() = { "table_id":103, "tablename":"sap_cost_centres", "bronze_file_format":"sap_table", ... }
+    Switch on "sap_table" → Copy From SAP to Parquet → <span class="so-ok">Succeeded  (12s)</span>
+
+  @item() = { "table_id":102, "tablename":"csat_responses", "bronze_file_format":"sharepoint_list", ... }
+    Switch on "sharepoint_list" → Copy SharePoint List to Parquet → <span class="so-ok">Succeeded  (4s)</span>
+
+<span class="so-ok">Pipeline run: Succeeded  (wall-clock 9s — parallel)</span>`,
+    activities:[
+      {
+        badge:'Filter', badgeColor:'amber', name:'Filter Tables by Sequence Number',
+        details:[
+          {l:'Items',v:'@pipeline().parameters.table_config',isCode:true},
+          {l:'Condition',v:'@equals(item().sequence_number, pipeline().parameters.sequence_number)',isCode:true},
+          {l:'Result',v:'Subset of table_config[] matching exactly this sequence number'},
+        ]
+      },
+      {
+        badge:'ForEach', badgeColor:'teal', name:'Process Each Table', sequential:false,
+        details:[
+          {l:'Items',v:"@activity('Filter Tables by Sequence Number').output.value",isCode:true},
+          {l:'Mode',v:'No isSequential flag → PARALLEL — all filtered tables run simultaneously'},
+        ],
+        nested:[{
+          badge:'Switch', badgeColor:'amber', name:'Switch by sources  on @item().bronze_file_format',
+          details:[
+            {l:'On',v:'@item().bronze_file_format',isCode:true},
+            {l:'Case sap_table',v:'InvokePipeline → copy_from_sap_to_parquet  (00000000-...-000003)  SAP RFC/OData path'},
+            {l:'Case csv',v:'InvokePipeline → copy_file_as_is  (00000000-...-000001)  binary copy, passes custom_source_path + file_type'},
+            {l:'Case parquet',v:'InvokePipeline → copy_file_as_is  (same placeholder)'},
+            {l:'Case json',v:'InvokePipeline → copy_file_as_is  (same placeholder)'},
+            {l:'Case excel',v:'InvokePipeline → copy_file_as_is  (same placeholder)'},
+            {l:'Case sharepoint_list',v:'InvokePipeline → copy_sharepoint_list_to_parquet  (00000000-...-000002)  Graph API reader, passes custom_source_path + custom_table_name'},
+            {l:'Case sap_table',v:'InvokePipeline → copy_from_sap_to_parquet  (00000000-...-000003)  SAP RFC/OData, passes sourcetablename + sourceschemaname'},
+            {l:'Default',v:'[] — no-op, unknown format silently skipped'},
+            {l:'File-case extras',v:'custom_source_path = @item().custom_source_path  ·  file_type = @item().file_type  (not sent for DB case)'},
+          ]
+        }]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+      {n:'table_config',t:'array'},{n:'sequence_number',t:'int'},
+    ]
+  },
+  'fn-b2s-obj': {
+    title:'bronze2silver_process_object', file:'bronze2silver_process_object.json',
+    type:'Process Pipeline', color:'teal',
+    sampleOutput:`<span class="so-h">activity: Filter Tables by Sequence Number</span>
+input.items:     output.value from Get Config Information  (8 rows)
+input.condition: @equals(item().sequence_number, 10)
+output: {
+  "itemsCount": 8,
+  "filterCount": 2,
+  "value": [
+    { "table_id":32, "tablename":<span class="so-val">"cities"</span>,    "bronze_file_format":"parquet_none_header", "sequence_number":10, "file_type":"parquet", "ref_table_id":1,  "ingest_partition":"1900-00-00-00", "criteria_columns":"",             "full_refresh_flag":"1" },
+    { "table_id":33, "tablename":<span class="so-val">"countries"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":10, "file_type":"parquet", "ref_table_id":2,  "ingest_partition":"2025-09-29-08", "criteria_columns":"",             "full_refresh_flag":"1" }
+  ]
+}
+
+<span class="so-h">ForEach Process Each Table (isSequential: true)</span>
+  [1/2] @item() = { "table_id":32, "tablename":"cities", "ingest_partition":"1900-00-00-00", ... }
+          → invoke refresh_warehouse_table → <span class="so-ok">Succeeded</span>  (1 partition loaded · 1m 44s)
+
+  [2/2] @item() = { "table_id":33, "tablename":"countries", "ingest_partition":"2025-09-29-08", ... }
+          → invoke refresh_warehouse_table → <span class="so-ok">Succeeded</span>  (2 partitions loaded · 3m 02s)
+
+<span class="so-ok">Pipeline run: Succeeded  (total 4m 46s — sequential)</span>`,
+    activities:[
+      {
+        badge:'Filter', badgeColor:'amber', name:'Filter Tables by Sequence Number',
+        details:[
+          {l:'Items',v:'@pipeline().parameters.table_config',isCode:true},
+          {l:'Condition',v:'@equals(item().sequence_number, pipeline().parameters.sequence_number)',isCode:true},
+        ]
+      },
+      {
+        badge:'ForEach', badgeColor:'teal', name:'Process Each Table', sequential:true,
+        details:[
+          {l:'Items',v:"@activity('Filter Tables by Sequence Number').output.value",isCode:true},
+          {l:'Mode',v:'isSequential: true — tables within sequence run one at a time'},
+        ],
+        nested:[{
+          badge:'Invoke', badgeColor:'gray', name:'Copy from Bronze to Silver → bronze2silver_refresh_warehouse_table  (73f385fb-...)',
+          details:[
+            {l:'Passes',v:'container, datasubject, classification, sourcesystem, sourceschema, sourceschemaname, sourcetablename, tablename, table_id, ingest_channel, ingest_partition, file_type, layer, criteria_columns, full_refresh_flag — all from @item()'},
+            {l:'waitOnCompletion',v:'true'},
+          ]
+        }]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+      {n:'table_config',t:'array'},{n:'sequence_number',t:'int'},
+    ]
+  },
+  'fn-switch': {
+    title:'Switch by sources  (inside src2brz_process_object)', file:'src2brz_process_object.json',
+    type:'Switch Activity', color:'blue',
+    sampleOutput:`<span class="so-h">Switch on @item().bronze_file_format</span>
+
+@item() = { "table_id":103, "tablename":"sap_cost_centres", <span class="so-val">"bronze_file_format":"sap_table"</span>, "sourcetablename":"CSKS", "sourceschemaname":"100", ... }
+  → matched case "sap_table"
+  → InvokePipeline copy_from_sap_to_parquet (00000000-...-000003)
+     parameters: { "table_id":"103", "sourcetablename":"CSKS", "sourceschemaname":"100", ... }
+  → <span class="so-ok">Succeeded  (12s)</span>
+
+@item() = { "table_id":101, "tablename":"fct_sales", <span class="so-val">"bronze_file_format":"file_as_is"</span>, "file_pattern":"fct_sales*", "custom_source_path":"https://iccpgroup.sharepoint.com/sites/Finance/...", ... }
+  → matched case "file_as_is"
+  → InvokePipeline copy_file_as_is (00000000-...-000001)
+     parameters: { "table_id":"101", "tablename":"fct_sales", "custom_source_path":"https://...", "file_pattern":"fct_sales*", "file_type":"excel", ... }
+  → <span class="so-ok">Succeeded  (2s)</span>
+
+@item() = { "table_id":102, "tablename":"csat_responses", <span class="so-val">"bronze_file_format":"sharepoint_list"</span>, "custom_table_name":"a1b2c3d4-...", "custom_source_path":"https://iccpgroup.sharepoint.com/sites/CSAT", ... }
+  → matched case "sharepoint_list"
+  → InvokePipeline copy_sharepoint_list_to_parquet (00000000-...-000002)
+     parameters: { "table_id":"102", "custom_source_path":"https://...", "custom_table_name":"a1b2c3d4-...", ... }
+  → <span class="so-ok">Succeeded  (4s)</span>
+
+@item() = { "table_id":103, "tablename":"sap_cost_centres", <span class="so-val">"bronze_file_format":"sap_table"</span>, "sourcetablename":"CSKS", "sourceschemaname":"100", ... }
+  → matched case "sap_table"
+  → InvokePipeline copy_from_sap_to_parquet (00000000-...-000003)
+     parameters: { "table_id":"103", "sourcetablename":"CSKS", "sourceschemaname":"100", ... }
+  → <span class="so-ok">Succeeded  (12s)</span>`,
+    activities:[
+      {
+        badge:'Switch', badgeColor:'amber', name:'Switch by sources',
+        details:[
+          {l:'On',v:'@item().bronze_file_format  ← read from elt_table_config for current table row',isCode:true},
+        ]
+      },
+      {
+        badge:'Case', badgeColor:'amber', name:'"sap_table" → src2brz_copy_from_sap_to_parquet',
+        details:[
+          {l:'Pipeline ID',v:'00000000-0000-0000-0000-000000000003  (placeholder — replace after Fabric deploy)'},
+          {l:'Use case',v:'Extracts a SAP table or CDS view via RFC BAPI / OData connector and writes rows to Parquet in the bronze partition.'},
+          {l:'Passes',v:'datasubject, classification, sourcesystem, sourceschema, sourceschemaname, sourcetablename, tablename, table_id, ingest_channel, ingest_partition, criteria_columns, full_refresh_flag, layer (all from @item())'},
+          {l:'Does NOT pass',v:'custom_source_path, custom_table_name (not relevant for SAP table source)'},
+        ]
+      },
+      {
+        badge:'Case', badgeColor:'teal', name:'"csv" / "parquet" / "json" / "excel" → src2brz_copy_file_as_is',
+        details:[
+          {l:'Pipeline ID',v:'00000000-0000-0000-0000-000000000001  (placeholder — replace after Fabric deploy)'},
+          {l:'Use case',v:'Files already in Lakehouse landing zone. Binary copy — zero format conversion.'},
+          {l:'Extra params',v:'custom_source_path = @item().custom_source_path  ·  file_type = @item().file_type'},
+          {l:'Note',v:'All 4 format cases point to the same pipeline — file_type param tells bronze2silver how to parse it later'},
+        ]
+      },
+      {
+        badge:'Case', badgeColor:'teal', name:'"sharepoint_list" → src2brz_copy_sharepoint_list_to_parquet',
+        details:[
+          {l:'Pipeline ID',v:'00000000-0000-0000-0000-000000000002  (placeholder — replace after Fabric deploy)'},
+          {l:'Use case',v:'Reads a SharePoint List via Microsoft Graph API and writes rows to a Parquet file in the bronze partition. custom_source_path = SharePoint site URL, custom_table_name = List GUID or name.'},
+          {l:'Extra params',v:'custom_source_path = @item().custom_source_path  ·  custom_table_name = @item().custom_table_name'},
+          {l:'Output',v:'Parquet file in bronze/…/{ingest_channel}/{trigger_hour}/  — same partition structure as other file formats'},
+        ]
+      },
+      {
+        badge:'Case', badgeColor:'amber', name:'"sap_table" → src2brz_copy_from_sap_to_parquet',
+        details:[
+          {l:'Pipeline ID',v:'00000000-0000-0000-0000-000000000003  (placeholder — replace after Fabric deploy)'},
+          {l:'Use case',v:'Extracts a SAP table or CDS view via RFC BAPI / OData connector and writes rows to a Parquet file in the bronze partition.'},
+          {l:'Extra params',v:'sourcetablename = SAP table/view name  ·  sourceschemaname = SAP client/schema'},
+          {l:'Output',v:'Parquet file in bronze/…/{ingest_channel}/{trigger_hour}/  — same partition structure as DB path'},
+        ]
+      },
+      {
+        badge:'Default', badgeColor:'gray', name:'Default case',
+        details:[{l:'Activities',v:'[] — no-op. Unknown bronze_file_format value is silently skipped.'}]
+      }
+    ],
+    params:[]
+  },
+  'fn-refresh': {
+    title:'bronze2silver_refresh_warehouse_table', file:'bronze2silver_refresh_warehouse_table.json',
+    type:'Function Pipeline', color:'teal',
+    sampleOutput:`<span class="so-h">activity: Get List Partitions</span>
+path: Files/bronze/application/confidential/sqlvm/application/cities/ingest_channel=dfp/
+output: {
+  "childItems": [
+    { "name": <span class="so-val">"2025-09-29-08"</span>, "type": "Folder" },
+    { "name": <span class="so-val">"2025-10-15-06"</span>, "type": "Folder" },
+    { "name": <span class="so-val">"2025-10-15-07"</span>, "type": "Folder" }
+  ]
+}
+
+<span class="so-h">activity: Filter Last Partitions</span>
+condition: @greater(item().name, pipeline().parameters.ingest_partition)
+           ingest_partition param = <span class="so-val">"1900-00-00-00"</span>  (watermark — all three folders are newer)
+output: {
+  "itemsCount": 3,
+  "filterCount": 3,
+  "value": [
+    { "name": "2025-09-29-08", "type": "Folder" },
+    { "name": "2025-10-15-06", "type": "Folder" },
+    { "name": "2025-10-15-07", "type": "Folder" }
+  ]
+}
+
+<span class="so-h">activity: Sorting list of Partitions  (OPENJSON in Warehouse)</span>
+output.value: [
+  { "name": <span class="so-val">"2025-09-29-08"</span> },
+  { "name": <span class="so-val">"2025-10-15-06"</span> },
+  { "name": <span class="so-val">"2025-10-15-07"</span> }
+]
+
+<span class="so-h">ForEach partition (isSequential: true)</span>
+  [1/3] @item().name = <span class="so-val">"2025-09-29-08"</span>
+          Notebook bronze2silver_transform_nbk → <span class="so-ok">Succeeded</span>
+          ├─ Notebook bronze2silver_dq_nbk     → <span class="so-ok">Succeeded  (rules_checked: 2, failures: 0)</span>
+          └─ SP update_load_status             → output: { "resultSets": [] }
+          → <span class="so-ok">elt_table_config.ingest_partition = "2025-09-29-08"</span>
+
+  [2/3] @item().name = <span class="so-val">"2025-10-15-06"</span>
+          Notebook bronze2silver_transform_nbk → <span class="so-ok">Succeeded</span>
+          ├─ Notebook bronze2silver_dq_nbk     → <span class="so-ok">Succeeded  (rules_checked: 2, failures: 0)</span>
+          └─ SP update_load_status             → output: { "resultSets": [] }
+          → <span class="so-ok">elt_table_config.ingest_partition = "2025-10-15-06"</span>
+
+  [3/3] @item().name = <span class="so-val">"2025-10-15-07"</span>
+          Notebook bronze2silver_transform_nbk → <span class="so-ok">Succeeded</span>
+          ├─ Notebook bronze2silver_dq_nbk     → <span class="so-ok">Succeeded  (rules_checked: 2, failures: 0)</span>
+          └─ SP update_load_status             → output: { "resultSets": [] }
+          → <span class="so-ok">elt_table_config.ingest_partition = "2025-10-15-07"</span>
+
+<span class="so-ok">Pipeline run: Succeeded  (total 5m 12s)</span>`,
+    activities:[
+      {
+        badge:'GetMetadata', badgeColor:'blue', name:'Get List Partitions',
+        details:[
+          {l:'Source',v:'MDF_LAKEHOUSE_DEV_001  (e638c447-1201-4ad5-b5c0-b51f406ec2ec)'},
+          {l:'Path',v:'bronze/@{datasubject}/@{classification}/@{sourcesystem}/@{sourceschema}/@{tablename}/@{ingest_channel}',isCode:true},
+          {l:'fieldList',v:'["childItems"]  — returns array of {name, type} objects for each sub-folder'},
+          {l:'Note',v:'Returns ALL partition folders — the Filter activity below narrows to unprocessed ones only'},
+        ]
+      },
+      {
+        badge:'Filter', badgeColor:'amber', name:'Filter Last Partitions  (depends on GetMetadata)',
+        details:[
+          {l:'Items',v:"@activity('Get List Partitions').output.childItems",isCode:true},
+          {l:'Condition',v:"@greater(\n  replace(item().name,'ingest_partition=',''),\n  pipeline().parameters.ingest_partition\n)",isCode:true},
+          {l:'Logic',v:'Strips the "ingest_partition=" prefix from folder name then compares to watermark string — keeps only newer partitions'},
+          {l:'Example',v:'watermark = "2025-01-10-09"  →  keeps "ingest_partition=2025-01-10-10", "…-11", etc.'},
+        ]
+      },
+      {
+        badge:'Lookup', badgeColor:'blue', name:'Sorting list of Partitions  (depends on Filter)',
+        details:[
+          {l:'Source',v:'Fabric Warehouse T-SQL  — MDF_WAREHOUSE_DEV_001'},
+          {l:'SQL',v:"DECLARE @JSON nvarchar(max) = N'@{activity(\"Filter Last Partitions\").output.Value}';\n\nSELECT [name]\nFROM OPENJSON(@JSON)\nWITH (\n  [name] varchar(200) '$.name',\n  [type] varchar(50)  '$.type'\n)\nORDER BY [name] ASC;",isCode:true},
+          {l:'Why Warehouse?',v:'Filter output is a JSON array. OPENJSON() in Fabric Warehouse T-SQL is the cleanest way to parse and sort it.'},
+          {l:'firstRowOnly',v:'false — returns all sorted partition names'},
+        ]
+      },
+      {
+        badge:'ForEach', badgeColor:'teal', name:'Process each partitions', sequential:true,
+        details:[
+          {l:'Items',v:"@activity('Sorting list of Partitions').output.value",isCode:true},
+          {l:'Mode',v:'isSequential: true — partitions always processed oldest-first so watermark only moves forward'},
+          {l:'Current item',v:'@item().name  =  e.g.  "ingest_partition=2025-01-10-10"  (folder name)'},
+        ],
+        nested:[
+          {
+            badge:'Notebook', badgeColor:'green', name:'Call to bronze2silver_transform_nbk',
+            details:[
+              {l:'Notebook ID',v:'00000000-0000-0000-0000-000000000002  (placeholder — replace after Fabric deploy)'},
+              {l:'ingest_partition param',v:'@item().name  ← folder name for current partition',isCode:true},
+              {l:'All params passed',v:'file_type, datasubject, classification, sourcesystem, sourceschema, tablename, ingest_channel, container, criteria_columns, full_refresh_flag, pipeline_id, pipeline_name, pipeline_run_id, pipeline_trigger_*'},
+            ]
+          },
+          {
+            badge:'SP', badgeColor:'purple', name:'Update Load Status  (depends on Notebook success)',
+            details:[
+              {l:'SP',v:'[mdf_platform_orchestration].[update_load_status]'},
+              {l:'last_ingest_partition',v:'@item().name  ← advances watermark to the partition just processed',isCode:true},
+              {l:'Effect',v:'Sets elt_table_config.ingest_partition — next run will skip this partition'},
+              {l:'Other params',v:'layer, table_id, pipeline_trigger_*, pipeline_id/name/run_id'},
+            ]
+          }
+        ]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+      {n:'container',t:'string'},{n:'datasubject',t:'string'},{n:'classification',t:'string'},
+      {n:'sourcesystem',t:'string'},{n:'sourceschema',t:'string'},{n:'sourceschemaname',t:'string'},
+      {n:'sourcetablename',t:'string'},{n:'tablename',t:'string'},{n:'table_id',t:'string'},
+      {n:'ingest_channel',t:'string'},{n:'latest_load_dt',t:'string'},{n:'ingest_partition',t:'string'},
+      {n:'criteria_columns',t:'string'},{n:'full_refresh_flag',t:'string'},{n:'layer',t:'string'},
+      {n:'file_type',t:'string'},
+    ]
+  },
+  'fn-file-copy': {
+    title:'src2brz_copy_file_as_is', file:'src2brz_copy_file_as_is.json',
+    type:'Function Pipeline', color:'teal',
+    sampleOutput:`<span class="so-h">activity: Copy File to Bronze</span>
+output: {
+  "dataRead":    1893376,
+  "dataWritten": 1893376,
+  "filesRead":   1,
+  "filesWritten":1,
+  "copyDuration":2,
+  "throughput":  900.36,
+  "errors": []
+}
+source : SharePoint  https://iccpgroup.sharepoint.com/sites/Finance/Shared Documents/Exports
+         wildcardFileName = <span class="so-val">"fct_sales*"</span>  (@pipeline().parameters.file_pattern)
+         connection: MDF_SHAREPOINT_DEV_001  (service principal · Sites.Read.All)
+         matched file: fct_sales_2025Q3.xlsx  (exact binary copy — no format conversion)
+sink   : <span class="so-val">Files/bronze/finance/confidential/sharepoint/share/fct_sales/ingest_channel=dfp/2025-10-15-06/fct_sales_2025Q3.xlsx</span>
+
+<span class="so-h">activity: Update Load Status</span>
+input: {
+  "table_id":              "101",
+  "last_ingest_partition": <span class="so-val">"2025-10-15-06"</span>,
+  "layer":                 "src2brz",
+  "pipeline_run_id":       "9c3a1f2e-..."
+}
+output: { "resultSets": [] }
+→ <span class="so-ok">elt_table_config.ingest_partition updated to "2025-10-15-06"</span>
+
+<span class="so-ok">Pipeline run: Succeeded  (total 2s)</span>`,
+    activities:[
+      {
+        badge:'Copy', badgeColor:'teal', name:'Copy File to Bronze  (Binary Copy — no format conversion)',
+        details:[
+          {l:'Source type',v:'BinarySource · LakehouseReadSettings · MDF_LAKEHOUSE_DEV_001'},
+          {l:'Source path',v:'{custom_source_path}/{sourcetablename}  (inside Lakehouse Files/)',isCode:true},
+          {l:'Sink type',v:'BinarySink · LakehouseWriteSettings · same MDF_LAKEHOUSE_DEV_001'},
+          {l:'Sink path',v:"bronze/@{datasubject}/@{classification}/@{sourcesystem}/@{sourceschema}/@{tablename}/@{ingest_channel}/@{formatDateTime(pipeline_trigger_time,'yyyy-MM-dd-HH')}/",isCode:true},
+          {l:'Binary mode',v:'Exact byte-for-byte copy — original file format (csv/json/parquet/excel) is preserved unchanged in bronze'},
+          {l:'deleteAfterCompletion',v:'false — source file stays in landing zone'},
+          {l:'Note',v:'file_type is carried downstream so bronze2silver picks the right pandas reader (read_parquet / read_csv / read_json / read_xml / read_excel)'},
+        ]
+      },
+      {
+        badge:'SP', badgeColor:'purple', name:'Update Load Status  (depends on Copy success)',
+        details:[
+          {l:'SP',v:'[mdf_platform_orchestration].[update_load_status]'},
+          {l:'last_ingest_partition',v:"@formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')",isCode:true},
+          {l:'Params',v:'layer, table_id, pipeline_trigger_*, pipeline_id/name/run_id'},
+        ]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+      {n:'container',t:'string'},{n:'datasubject',t:'string'},{n:'classification',t:'string'},
+      {n:'sourcesystem',t:'string'},{n:'sourceschema',t:'string'},{n:'sourceschemaname',t:'string'},
+      {n:'sourcetablename',t:'string'},{n:'tablename',t:'string'},{n:'table_id',t:'string'},
+      {n:'ingest_channel',t:'string'},{n:'latest_load_dt',t:'string'},{n:'ingest_partition',t:'string'},
+      {n:'criteria_columns',t:'string'},{n:'full_refresh_flag',t:'string'},{n:'layer',t:'string'},
+      {n:'custom_source_path',t:'string'},{n:'file_type',t:'string'},
+    ]
+  },
+  'fn-sp-list': {
+    title:'src2brz_copy_sharepoint_list_to_parquet', file:'src2brz_copy_sharepoint_list_to_parquet.json',
+    type:'Function Pipeline', color:'teal',
+    sampleOutput:`<span class="so-h">activity: Copy SharePoint List to Bronze</span>
+output: {
+  "rowsRead":    <span class="so-val">384</span>,
+  "rowsCopied":  <span class="so-val">384</span>,
+  "dataRead":    98304,
+  "dataWritten": 45056,
+  "filesWritten": 1,
+  "copyDuration": 4,
+  "errors": []
+}
+source : SharePoint List  <span class="so-val">https://iccpgroup.sharepoint.com/sites/CSAT</span>
+         List GUID: <span class="so-val">a1b2c3d4-e5f6-7890-abcd-ef1234567890</span>  (@pipeline().parameters.custom_table_name)
+         connection: MDF_SHAREPOINT_DEV_001  (Graph API · Sites.Read.All)
+         all list columns read as-is (Graph API returns them as JSON)
+sink   : <span class="so-val">Files/bronze/financial/restricted/sharepoint/share/csat_responses/ingest_channel=dfp/2025-10-15-06/csat_responses.parquet</span>
+
+<span class="so-h">activity: Update Load Status</span>
+input: {
+  "table_id":              "102",
+  "last_ingest_partition": <span class="so-val">"2025-10-15-06"</span>,
+  "layer":                 "src2brz",
+  "pipeline_run_id":       "7e4a2c9b-..."
+}
+output: { "resultSets": [] }
+→ <span class="so-ok">elt_table_config.ingest_partition updated to "2025-10-15-06"</span>
+
+<span class="so-ok">Pipeline run: Succeeded  (total 4s)</span>`,
+    activities:[
+      {
+        badge:'Copy', badgeColor:'teal', name:'Copy SharePoint List rows to Parquet in bronze',
+        details:[
+          {l:'Source type',v:'SharePointOnlineListSource — reads list items via Microsoft Graph API'},
+          {l:'Site URL',v:'@pipeline().parameters.custom_source_path  (e.g. https://iccpgroup.sharepoint.com/sites/CSAT)',isCode:true},
+          {l:'List name/GUID',v:'@pipeline().parameters.custom_table_name  (GUID or display name)',isCode:true},
+          {l:'Connection',v:'MDF_SHAREPOINT_DEV_001  (service principal with Sites.Read.All)'},
+          {l:'Sink type',v:'ParquetSink → MDF_LAKEHOUSE_DEV_001  (e638c447-1201-4ad5-b5c0-b51f406ec2ec)'},
+          {l:'Sink path',v:"@{container}/@{datasubject}/@{classification}/@{sourcesystem}/@{sourceschema}/@{tablename}/@{ingest_channel}/@{formatDateTime(pipeline_trigger_time,'yyyy-MM-dd-HH')}/",isCode:true},
+          {l:'Sink file',v:'@{tablename}.parquet'},
+          {l:'additionalCols',v:'pipeline_id, pipeline_name, pipeline_run_id, pipeline_trigger_time — appended to every row'},
+        ]
+      },
+      {
+        badge:'SP', badgeColor:'purple', name:'Update Load Status  (depends on Copy success)',
+        details:[
+          {l:'SP',v:'[mdf_platform_orchestration].[update_load_status]'},
+          {l:'last_ingest_partition',v:"@{formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')}",isCode:true},
+          {l:'Params',v:'layer, table_id, pipeline_trigger_*, pipeline_id/name/run_id'},
+        ]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+      {n:'container',t:'string'},{n:'datasubject',t:'string'},{n:'classification',t:'string'},
+      {n:'sourcesystem',t:'string'},{n:'sourceschema',t:'string'},{n:'tablename',t:'string'},
+      {n:'table_id',t:'string'},{n:'ingest_channel',t:'string'},{n:'ingest_partition',t:'string'},
+      {n:'custom_source_path',t:'string'},{n:'custom_table_name',t:'string'},
+      {n:'criteria_columns',t:'string'},{n:'full_refresh_flag',t:'string'},{n:'layer',t:'string'},
+    ]
+  },
+  'fn-sap': {
+    title:'src2brz_copy_from_sap_to_parquet', file:'src2brz_copy_from_sap_to_parquet.json',
+    type:'Function Pipeline', color:'amber',
+    sampleOutput:`<span class="so-h">activity: Copy SAP Table to Bronze</span>
+output: {
+  "rowsRead":    <span class="so-val">12847</span>,
+  "rowsCopied":  <span class="so-val">12847</span>,
+  "dataRead":    3145728,
+  "dataWritten": 819200,
+  "filesWritten": 1,
+  "copyDuration": 12,
+  "errors": []
+}
+source : SAP RFC/OData  client=<span class="so-val">100</span>  table=<span class="so-val">CSKS</span>  (Cost Centre Master)
+         connection: MDF_SAP_DEV_001  (RFC BAPI / SAP OData connector)
+         query: SELECT * FROM CSKS  (all columns, no WHERE — full extract)
+         + additionalColumns: pipeline metadata appended to every row
+sink   : <span class="so-val">Files/bronze/financial/restricted/sap/controlling/sap_cost_centres/ingest_channel=dfp/2025-10-15-06/sap_cost_centres.parquet</span>
+
+<span class="so-h">activity: Update Load Status</span>
+input: {
+  "table_id":              "103",
+  "last_ingest_partition": <span class="so-val">"2025-10-15-06"</span>,
+  "layer":                 "src2brz",
+  "pipeline_run_id":       "2b7f1d4a-..."
+}
+output: { "resultSets": [] }
+→ <span class="so-ok">elt_table_config.ingest_partition updated to "2025-10-15-06"</span>
+
+<span class="so-ok">Pipeline run: Succeeded  (total 12s)</span>`,
+    activities:[
+      {
+        badge:'Copy', badgeColor:'amber', name:'Copy SAP table rows to Parquet in bronze',
+        details:[
+          {l:'Source type',v:'SapTableSource or SapOdpSource — reads via SAP RFC BAPI connector or OData'},
+          {l:'Client/schema',v:'@pipeline().parameters.sourceschemaname  (SAP client number, e.g. "100")',isCode:true},
+          {l:'Table/view',v:'@pipeline().parameters.sourcetablename  (e.g. "CSKS", "BKPF")',isCode:true},
+          {l:'Connection',v:'MDF_SAP_DEV_001  (SAP RFC connector with appropriate RFC user)'},
+          {l:'No gateway needed',v:'SAP connector uses a Fabric data gateway or Integration Runtime depending on network topology'},
+          {l:'Sink type',v:'ParquetSink → MDF_LAKEHOUSE_DEV_001  (e638c447-1201-4ad5-b5c0-b51f406ec2ec)'},
+          {l:'Sink path',v:"@{container}/@{datasubject}/@{classification}/@{sourcesystem}/@{sourceschema}/@{tablename}/@{ingest_channel}/@{formatDateTime(pipeline_trigger_time,'yyyy-MM-dd-HH')}/",isCode:true},
+          {l:'Sink file',v:'@{sourcetablename}.parquet'},
+          {l:'additionalCols',v:'pipeline_id, pipeline_name, pipeline_run_id, pipeline_trigger_time — appended to every row'},
+        ]
+      },
+      {
+        badge:'SP', badgeColor:'purple', name:'Update Load Status  (depends on Copy success)',
+        details:[
+          {l:'SP',v:'[mdf_platform_orchestration].[update_load_status]'},
+          {l:'last_ingest_partition',v:"@{formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')}",isCode:true},
+          {l:'Params',v:'layer, table_id, pipeline_trigger_*, pipeline_id/name/run_id'},
+        ]
+      }
+    ],
+    params:[
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+      {n:'container',t:'string'},{n:'datasubject',t:'string'},{n:'classification',t:'string'},
+      {n:'sourcesystem',t:'string'},{n:'sourceschema',t:'string'},{n:'sourceschemaname',t:'string'},
+      {n:'sourcetablename',t:'string'},{n:'tablename',t:'string'},{n:'table_id',t:'string'},
+      {n:'ingest_channel',t:'string'},{n:'ingest_partition',t:'string'},
+      {n:'criteria_columns',t:'string'},{n:'full_refresh_flag',t:'string'},{n:'layer',t:'string'},
+    ]
+  },
+  'fn-nbk': {
+    title:'bronze2silver_transform_nbk', file:'bronze2silver_transform_nbk.ipynb',
+    type:'Python Notebook — no PySpark', color:'green',
+    sampleOutput:`<span class="so-h">Cell 1  Parameters (injected by pipeline)</span>
+tablename         = <span class="so-val">"cities"</span>
+file_type         = <span class="so-val">"parquet"</span>
+ingest_partition  = <span class="so-val">"2025-09-29-08"</span>
+criteria_columns  = <span class="so-val">""</span>
+full_refresh_flag = <span class="so-val">"1"</span>
+datasubject       = "application"  classification = "confidential"
+sourcesystem      = "sqlvm"        sourceschema   = "application"
+pipeline_run_id   = "4f2b8c1a-9d12-4e7b-8c30-1a2b3c4d5e6f"
+
+<span class="so-h">Cell 2  Read bronze</span>
+path  : /lakehouse/default/Files/bronze/application/confidential/sqlvm/application/cities/ingest_channel=dfp/2025-09-29-08/
+files : ['cities.parquet']
+df.shape: (217, 11)
+df.dtypes:
+  CityID              int64
+  CityName            object
+  StateProvinceID     int64
+  LatestRecordedPopulation  float64
+  LastEditedBy        int64
+  ValidFrom           object
+  ValidTo             object
+  pipeline_id         object
+  pipeline_name       object
+  pipeline_run_id     object
+  pipeline_trigger_time  object
+
+<span class="so-h">Cell 4b  Schema config overrides</span>
+queried elt_schema_config WHERE table_id = '1'  → <span class="so-dim">0 rows  (no overrides for this table)</span>
+all 11 columns: auto-inferred types
+
+<span class="so-h">Cell 4c  Transform config rules</span>
+queried elt_transform_config WHERE table_id = '1'  → <span class="so-dim">0 rows  (no transform rules for this table)</span>
+rows after transforms: 217
+
+<span class="so-h">Cell 4  Stage parquet</span>
+written: Files/_staging/bronze2silver/cities/4f2b8c1a-9d12.parquet
+rows: 217  size: 18.4 KB  (snappy)
+
+<span class="so-h">Cell 7  COPY INTO staging table</span>
+staging_fqn = [silver].[cities__stg_4f2b8c1a]
+DROP TABLE IF EXISTS → CREATE TABLE → COPY INTO
+output: <span class="so-ok">217 rows loaded  (0.6s)</span>
+
+<span class="so-h">Cell 8  Load mode: full_refresh_flag = "1"  →  TRUNCATE + INSERT</span>
+TRUNCATE TABLE [silver].[cities]  →  0 rows remaining
+INSERT INTO [silver].[cities] SELECT * FROM [silver].[cities__stg_4f2b8c1a]
+output: <span class="so-ok">217 rows inserted</span>
+
+<span class="so-h">Cell 9  Cleanup</span>
+DROP TABLE [silver].[cities__stg_4f2b8c1a]
+os.remove(Files/_staging/bronze2silver/cities/4f2b8c1a-9d12.parquet)
+conn.commit(); conn.close()
+print: <span class="so-ok">{"status":"SUCCESS","silver":"[silver].[cities]","mode":"full_refresh","rows":217,"run_id":"4f2b8c1a-...","partition":"2025-09-29-08"}</span>`,
+    activities:[
+      {
+        badge:'Python', badgeColor:'amber', name:'Cell 1 — Parameters  (injected by Fabric)',
+        details:[
+          {l:'Purpose',v:'Standard Fabric parameters cell. Values come from the Notebook activity parameters on the calling refresh_warehouse_table pipeline.'},
+          {l:'Code',v:`file_type = ""          # parquet | csv | json | xml | excel
+datasubject = ""; classification = ""; sourcesystem = ""
+sourceschema = ""; tablename = ""; ingest_channel = ""
+ingest_partition = ""   # folder name from ForEach iteration
+container = ""
+criteria_columns = ""   # CSV of business keys for SCD2 (e.g. "id,tenant_id")
+full_refresh_flag = "N" # Y => TRUNCATE + bulk insert
+pipeline_id = pipeline_name = pipeline_run_id = ""
+pipeline_trigger_id = pipeline_trigger_time = pipeline_trigger_type = ""
+
+# Warehouse target + Lakehouse ABFSS (for COPY INTO)
+warehouse_endpoint = "...-datawarehouse.fabric.microsoft.com"
+warehouse_name     = "MDF_WAREHOUSE_DEV_001"
+silver_schema      = "silver"
+onelake_workspace_id = "9eed8444-..."
+onelake_lakehouse_id = "e638c447-..."`,isCode:true},
+        ]
+      },
+      {
+        badge:'Python', badgeColor:'amber', name:'Cell 2 — Read bronze in native format (pandas/pyarrow)',
+        details:[
+          {l:'Purpose',v:'Dispatches on file_type to the right pandas/pyarrow reader. Bronze files were NEVER converted in src2brz — the notebook is the first place format matters.'},
+          {l:'Code',v:`def read_bronze(path, fmt):
+    files = sorted(Path(path).rglob("*"))
+    if fmt == "parquet": return pads.dataset(files, format="parquet").to_table().to_pandas()
+    if fmt == "csv":     return pd.concat([pd.read_csv(f) for f in files])
+    if fmt == "json":    return pd.concat([pd.read_json(f, lines=True) for f in files])
+    if fmt == "xml":     return pd.concat([pd.read_xml(f) for f in files])
+    if fmt == "excel":   return pd.concat([pd.read_excel(f) for f in files])
+
+df = read_bronze(bronze_local, file_type)`,isCode:true},
+        ]
+      },
+      {
+        badge:'Python', badgeColor:'amber', name:'Cell 3 — Audit columns + row_hash + SCD2 envelope',
+        details:[
+          {l:'Purpose',v:'Append audit trail + compute a deterministic SHA-256 hash over business columns (used by the SCD2 merge to detect actual content change, not just row arrival).'},
+          {l:'Code',v:`for k, v in audit_cols.items(): df[k] = v
+business_cols = [c for c in df.columns if c not in audit_cols]
+
+def _row_to_hash(r):
+    payload = "\\u241e".join("" if pd.isna(v) else str(v) for v in r)
+    return hashlib.sha256(payload.encode()).digest()
+
+df["row_hash"]   = df[business_cols].apply(_row_to_hash, axis=1)
+df["valid_from"] = datetime.now(timezone.utc).replace(tzinfo=None)
+df["valid_to"]   = pd.NaT
+df["is_current"] = True`,isCode:true},
+        ]
+      },
+      {
+        badge:'Python', badgeColor:'amber', name:'Cell 4 — Stage parquet to Lakehouse Files/_staging/',
+        details:[
+          {l:'Purpose',v:'Write a single compacted parquet the Warehouse can ingest via COPY INTO. Lakehouse Files is addressable via an ABFSS URL using the OneLake workspace + lakehouse IDs.'},
+          {l:'Code',v:`staging_rel   = f"Files/_staging/bronze2silver/{tablename}/{pipeline_run_id}.parquet"
+staging_local = f"/lakehouse/default/{staging_rel}"
+staging_abfss = (
+    f"abfss://{onelake_workspace_id}@onelake.dfs.fabric.microsoft.com/"
+    f"{onelake_lakehouse_id}/{staging_rel}"
+)
+os.makedirs(os.path.dirname(staging_local), exist_ok=True)
+pq.write_table(pa.Table.from_pandas(df, preserve_index=False),
+               staging_local, compression="snappy")`,isCode:true},
+        ]
+      },
+      {
+        badge:'Python', badgeColor:'amber', name:'Cell 5 — Connect to Fabric Warehouse via pyodbc + Entra token',
+        details:[
+          {l:'Purpose',v:'Uses DefaultAzureCredential to get an Azure AD access token and passes it to ODBC Driver 18 via SQL_COPT_SS_ACCESS_TOKEN (attr 1256). No SQL login, no password — identity from the notebook session.'},
+          {l:'Code',v:`token = DefaultAzureCredential().get_token(
+    "https://database.windows.net/.default").token
+token_bytes = bytes(token, "utf-8")
+exp_token = b""
+for b in token_bytes: exp_token += bytes({b}) + bytes(1)
+attrs = {1256: struct.pack("=i", len(exp_token)) + exp_token}
+
+conn = pyodbc.connect(
+    "Driver={ODBC Driver 18 for SQL Server};"
+    f"Server={warehouse_endpoint},1433;"
+    f"Database={warehouse_name};"
+    "Encrypt=yes;TrustServerCertificate=no;",
+    attrs_before=attrs, autocommit=False)`,isCode:true},
+        ]
+      },
+      {
+        badge:'Python → T-SQL', badgeColor:'blue', name:'Cell 6 — DDL: create silver table from DataFrame dtypes',
+        details:[
+          {l:'Purpose',v:'First-run bootstrap. Maps pandas dtypes → T-SQL types, builds CREATE TABLE IF NOT EXISTS DDL, and runs it. SCD2 columns (row_hash, valid_from, valid_to, is_current) are typed explicitly.'},
+          {l:'Code',v:`_PANDAS_TO_TSQL = {"int64":"bigint","float64":"float","bool":"bit",
+    "datetime64[ns]":"datetime2","object":"varchar(8000)"}
+
+def tsql_type(dtype, col):
+    if col == "row_hash":   return "varbinary(32)"
+    if col == "valid_from": return "datetime2 NOT NULL"
+    if col == "valid_to":   return "datetime2 NULL"
+    if col == "is_current": return "bit NOT NULL"
+    return _PANDAS_TO_TSQL.get(str(dtype), "varchar(8000)")
+
+col_defs = ",\\n".join(f"[{c}] {tsql_type(df[c].dtype, c)}" for c in df.columns)
+execute(conn, f"""IF OBJECT_ID(N'[silver].[{tablename}]','U') IS NULL
+  CREATE TABLE [silver].[{tablename}] ({col_defs})""")`,isCode:true},
+        ]
+      },
+      {
+        badge:'Python → T-SQL', badgeColor:'blue', name:'Cell 7 — COPY INTO staging (Warehouse pulls parquet)',
+        details:[
+          {l:'Purpose',v:'Create a run-scoped staging table with identical shape, then load the staged parquet into it via COPY INTO. The Warehouse reads directly from OneLake — no round-trip through Python.'},
+          {l:'Code',v:`staging_fqn = f"[silver].[{tablename}__stg_{pipeline_run_id[:16]}]"
+execute(conn, f"DROP TABLE IF EXISTS {staging_fqn}")
+execute(conn, f"CREATE TABLE {staging_fqn} ({col_defs})")
+execute(conn, f"""
+COPY INTO {staging_fqn}
+FROM '{staging_abfss}'
+WITH (FILE_TYPE = 'PARQUET')
+""")`,isCode:true},
+        ]
+      },
+      {
+        badge:'Python → T-SQL', badgeColor:'blue', name:'Cell 8 — SCD Type 2 merge (close + insert)',
+        details:[
+          {l:'Purpose',v:'Classic SCD2 pattern. Step 1 closes rows where the business key matches but row_hash differs (valid_to=now, is_current=0). Step 2 LEFT JOINs current silver — any staging row without a current match is inserted as a new version (handles both "changed" and "brand-new" cases).'},
+          {l:'Why two steps?',v:'After step 1 closes the stale rows, their is_current flips to 0, so the LEFT JOIN on is_current=1 in step 2 naturally treats them as missing and re-inserts the new version. One clean INSERT covers changed + new.'},
+          {l:'Full refresh path',v:"If full_refresh_flag='Y' or business_keys is empty, the notebook TRUNCATEs and bulk-INSERTs instead — useful for dimension reloads or when SCD2 isn't wanted."},
+          {l:'Code',v:`pk_join = " AND ".join(f"t.[{k}] = s.[{k}]" for k in business_keys)
+
+# Step 1: close changed rows
+execute(conn, f"""
+UPDATE t
+   SET t.valid_to   = s.valid_from,
+       t.is_current = 0
+  FROM [silver].[{tablename}] t
+  JOIN {staging_fqn}          s ON {pk_join}
+ WHERE t.is_current = 1 AND t.row_hash <> s.row_hash
+""")
+
+# Step 2: insert new versions (changed PKs + brand-new PKs)
+execute(conn, f"""
+INSERT INTO [silver].[{tablename}] ({col_list}, [valid_from], [valid_to], [is_current])
+SELECT {sel}, s.valid_from, NULL, 1
+  FROM {staging_fqn} s
+  LEFT JOIN [silver].[{tablename}] t
+    ON {pk_join} AND t.is_current = 1
+ WHERE t.[{business_keys[0]}] IS NULL
+""")`,isCode:true},
+        ]
+      },
+      {
+        badge:'Python', badgeColor:'amber', name:'Cell 9 — Cleanup + exit status',
+        details:[
+          {l:'Purpose',v:'Drop the run-scoped staging table, delete the staged parquet, commit + close the pyodbc connection, emit a JSON status line the pipeline can read.'},
+          {l:'Code',v:`execute(conn, f"DROP TABLE IF EXISTS {staging_fqn}")
+conn.commit(); conn.close()
+try: os.remove(staging_local)
+except FileNotFoundError: pass
+
+print(json.dumps({
+    "status": "SUCCESS", "silver": f"[silver].[{tablename}]",
+    "mode": mode, "rows": len(df),
+    "run_id": pipeline_run_id, "partition": ingest_partition,
+}))`,isCode:true},
+        ]
+      }
+    ],
+    params:[
+      {n:'file_type',t:'string'},{n:'datasubject',t:'string'},{n:'classification',t:'string'},
+      {n:'sourcesystem',t:'string'},{n:'sourceschema',t:'string'},{n:'tablename',t:'string'},
+      {n:'ingest_channel',t:'string'},{n:'ingest_partition',t:'string'},{n:'container',t:'string'},
+      {n:'criteria_columns',t:'string'},{n:'full_refresh_flag',t:'string'},
+      {n:'pipeline_id',t:'string'},{n:'pipeline_name',t:'string'},{n:'pipeline_run_id',t:'string'},
+      {n:'pipeline_trigger_id',t:'string'},{n:'pipeline_trigger_time',t:'string'},{n:'pipeline_trigger_type',t:'string'},
+    ]
+  }
+};
+
+/* ═══════ MODAL RENDER ═══════ */
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+const NOTEBOOK_BADGES = new Set(['Notebook','Python','Python → T-SQL','%%sql']);
+function flatActivities(acts){
+  let out=[];
+  for(const a of acts){
+    out.push(a);
+    if(a.nested) out=out.concat(flatActivities(a.nested));
+  }
+  return out;
+}
+function actOwner(badge){ return NOTEBOOK_BADGES.has(badge) ? 'notebook' : 'pipeline'; }
+function actOwnerLabel(badge){ return NOTEBOOK_BADGES.has(badge) ? 'Notebook · Python' : 'Fabric Pipeline'; }
+
+function renderAct(a, depth){
+  depth = depth||0;
+  let h = `<div class="act-item" style="${depth?'margin-top:6px;background:white':''}">`;
+  h += `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:4px">`;
+  h += `<span class="act-badge ${a.badgeColor}">${esc(a.badge)}</span>`;
+  h += `<span class="act-owner ${actOwner(a.badge)}">${actOwnerLabel(a.badge)}</span>`;
+  if(a.sequential===true)  h += `<span class="act-seq-tag seq">sequential</span>`;
+  if(a.sequential===false) h += `<span class="act-seq-tag par">parallel</span>`;
+  h += `</div>`;
+  h += `<div class="act-name">${esc(a.name)}</div>`;
+  if(a.details && a.details.length){
+    h += `<div class="act-details">`;
+    for(const d of a.details){
+      if(d.isCode){
+        h += `<div class="act-detail"><span class="act-dlabel">${esc(d.l)}</span><pre class="act-code">${esc(d.v)}</pre></div>`;
+      } else {
+        h += `<div class="act-detail"><span class="act-dlabel">${esc(d.l)}</span>${esc(d.v)}</div>`;
+      }
+    }
+    h += `</div>`;
+  }
+  if(a.nested && a.nested.length){
+    h += `<div class="act-nested">`;
+    h += `<div class="act-nested-label">Inner activities</div>`;
+    for(const n of a.nested) h += renderAct(n, depth+1);
+    h += `</div>`;
+  }
+  h += `</div>`;
+  return h;
+}
+
+function openModal(id){
+  const d = NODE_DETAILS[id]; if(!d) return;
+  hideTooltip();
+  const modal = document.getElementById('node-modal');
+  document.getElementById('modal-type').className = 'tt-type '+d.color;
+  document.getElementById('modal-type').textContent = d.type;
+  document.getElementById('modal-title').textContent = d.title;
+  document.getElementById('modal-file').textContent = d.file;
+  const allActs = flatActivities(d.activities||[]);
+  const nbCount = allActs.filter(a=>NOTEBOOK_BADGES.has(a.badge)).length;
+  const plCount = allActs.length - nbCount;
+  const legend = `<div class="acts-legend">
+    <div class="acts-legend-item"><span class="act-owner pipeline">Fabric Pipeline</span>${plCount} activit${plCount===1?'y':'ies'} — runs in pipeline engine</div>
+    ${nbCount>0?`<div class="acts-legend-item"><span class="act-owner notebook">Notebook · Spark</span>${nbCount} activit${nbCount===1?'y':'ies'} — runs in Spark session</div>`:''}
+  </div>`;
+  let actsHtml = (d.activities||[]).map(a=>renderAct(a,0)).join('') + legend;
+  if(d.sampleOutput){
+    actsHtml += `<div class="sample-out-label">Sample run output</div><pre class="sample-out-block">${d.sampleOutput}</pre>`;
+  }
+  document.getElementById('modal-acts-content').innerHTML = actsHtml;
+  const pts = d.params||[];
+  document.getElementById('modal-params-content').innerHTML = pts.length
+    ? `<table class="param-table"><thead><tr><th>Name</th><th>Type</th></tr></thead><tbody>`
+      + pts.map(p=>`<tr><td><span class="param-name">${esc(p.n)}</span></td><td><span class="param-type-tag">${esc(p.t)}</span></td></tr>`).join('')
+      + `</tbody></table>`
+    : `<div style="font-size:11px;color:var(--tx3)">No declared parameters — reads directly from pipeline() system variables.</div>`;
+  modal.classList.add('open');
+  document.getElementById('modal-acts').scrollTop = 0;
+}
+function closeModal(){
+  document.getElementById('node-modal').classList.remove('open');
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* ═══════ TOOLTIP ═══════ */
+const tooltip=document.getElementById('tooltip');
+let ttVisible=false;
+
+function showTooltip(e,id){
+  const data=TOOLTIPS[id]; if(!data) return;
+  document.getElementById('tt-type').className='tt-type '+data.color;
+  document.getElementById('tt-type').textContent=data.type;
+  document.getElementById('tt-title').textContent=data.title;
+  document.getElementById('tt-body').textContent=data.body;
+  const actsEl=document.getElementById('tt-acts');
+  actsEl.innerHTML=data.acts.map(a=>`<div class="tt-act"><i class="tt-act-icon">${a.icon}</i>${esc(a.text)}</div>`).join('');
+  positionTooltip(e);
+  tooltip.classList.add('visible');
+  ttVisible=true;
+}
+function positionTooltip(e){
+  const vw=window.innerWidth, vh=window.innerHeight;
+  let x=e.clientX+16, y=e.clientY-20;
+  if(x+290>vw) x=e.clientX-300;
+  if(y+320>vh) y=vh-330;
+  tooltip.style.left=x+'px'; tooltip.style.top=y+'px';
+}
+function hideTooltip(){
+  tooltip.classList.remove('visible'); ttVisible=false;
+}
+
+// Wire up all flow nodes
+Object.keys(TOOLTIPS).forEach(id=>{
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('mouseenter', e=>showTooltip(e,id));
+  el.addEventListener('mousemove',  e=>{ if(ttVisible) positionTooltip(e); });
+  el.addEventListener('mouseleave', hideTooltip);
+  el.addEventListener('click', ()=>openModal(id));
+});
+
+/* ═══════ NAV SCROLL SPY ═══════ */
+const sections=[...document.querySelectorAll('section[id]')];
+const dots=[...document.querySelectorAll('.dot')];
+const navLinks=[...document.querySelectorAll('.nl[href^="#"]')];
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(!e.isIntersecting) return;
+    const id=e.target.id;
+    dots.forEach(d=>d.classList.toggle('active',d.dataset.s===id));
+    navLinks.forEach(l=>l.classList.toggle('active',l.getAttribute('href')==='#'+id));
+  });
+},{threshold:0.4});
+sections.forEach(s=>observer.observe(s));
+dots.forEach(d=>{
+  d.addEventListener('click',()=>{
+    document.getElementById(d.dataset.s)?.scrollIntoView({behavior:'smooth'});
+  });
+});
+
+buildPaths();
+</script>
+</body>
+</html>

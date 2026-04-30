@@ -1,0 +1,194 @@
+{
+    "name": "silver2gold_get_config",
+    "objectId": "7119f6f8-d47f-4153-be55-06736ca5a76f",
+    "properties": {
+        "activities": [
+            {
+                "name": "Get Sequence Nbr",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "DataWarehouseSource",
+                        "sqlReaderQuery": {
+                            "value": "SELECT  \t[sequence_number]\nFROM \t[mdf_platform_orchestration].[elt_table_config]\nWHERE\t[layer] = '@{split(pipeline().parameters.pipeline_name, '_')[0]}'\nAND     [datasubject] = '@{split(pipeline().parameters.pipeline_name, '_')[1]}'\nGROUP BY\t[sequence_number]\nORDER BY\t[sequence_number]",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "firstRowOnly": false,
+                    "datasetSettings": {
+                        "annotations": [],
+                        "linkedService": {
+                            "name": "MDF_WAREHOUSE_DEV_001",
+                            "properties": {
+                                "annotations": [],
+                                "type": "DataWarehouse",
+                                "typeProperties": {
+                                    "endpoint": "nv3l45p7irxunojdrwsud5otge-isco3hrff5zuzpeqnjwvvo6u5i.datawarehouse.fabric.microsoft.com",
+                                    "artifactId": "c3761e0c-3b74-4d36-8fe6-69d703178d65",
+                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                }
+                            }
+                        },
+                        "type": "DataWarehouseTable",
+                        "schema": []
+                    }
+                }
+            },
+            {
+                "name": "Get Config Information",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "DataWarehouseSource",
+                        "sqlReaderQuery": {
+                            "value": "SELECT  \t[table_id]\n      ,[datasubject]\n      ,[classification]\n      ,[sourcesystem]\n      ,[sourceschema]\n      ,[sourceschemaname]\n      ,[sourcetablename]\n      ,[tablename]\n      ,[job_group]\n      ,[custom_source_path]\n      ,[ingest_channel]\n      ,[file_type]\n      ,[custom_table_name]\n      ,[ingest_partition]\n      ,[layer]\n      ,[container]\n      ,[stg_file_type]\n      ,[ref_table_id]\n      ,[process_id]\n      ,[sequence_number]\n      ,[stg_file_format]\n      ,[cycle]\n      ,[ref_ingest_partition]\n      ,[last_loaded_dt]\n      ,[criteria_columns]\n      ,[full_refresh_flag]\n  FROM [mdf_platform_orchestration].[elt_table_config]\nWHERE\t[layer] = '@{split(pipeline().parameters.pipeline_name, '_')[0]}'\nAND     [datasubject] = '@{split(pipeline().parameters.pipeline_name, '_')[1]}'",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "firstRowOnly": false,
+                    "datasetSettings": {
+                        "annotations": [],
+                        "linkedService": {
+                            "name": "MDF_WAREHOUSE_DEV_001",
+                            "properties": {
+                                "annotations": [],
+                                "type": "DataWarehouse",
+                                "typeProperties": {
+                                    "endpoint": "nv3l45p7irxunojdrwsud5otge-isco3hrff5zuzpeqnjwvvo6u5i.datawarehouse.fabric.microsoft.com",
+                                    "artifactId": "c3761e0c-3b74-4d36-8fe6-69d703178d65",
+                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                }
+                            }
+                        },
+                        "type": "DataWarehouseTable",
+                        "schema": []
+                    }
+                }
+            },
+            {
+                "name": "ForEach Sequence Nbr",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Get Sequence Nbr",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    },
+                    {
+                        "activity": "Get Config Information",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Get Sequence Nbr').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "Process tables on each sequence nbr",
+                            "type": "InvokePipeline",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "typeProperties": {
+                                "waitOnCompletion": true,
+                                "operationType": "InvokeFabricPipeline",
+                                "pipelineId": "1d82cb6e-ba67-4b32-a93f-5f9759ebfd37",
+                                "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                "parameters": {
+                                    "pipeline_id": {
+                                        "value": "@pipeline().parameters.pipeline_id",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_name": {
+                                        "value": "@pipeline().parameters.pipeline_name",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_run_id": {
+                                        "value": "@pipeline().parameters.pipeline_run_id",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_trigger_id": {
+                                        "value": "@pipeline().parameters.pipeline_trigger_id",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_trigger_time": {
+                                        "value": "@pipeline().parameters.pipeline_trigger_time",
+                                        "type": "Expression"
+                                    },
+                                    "pipeline_trigger_type": {
+                                        "value": "@pipeline().parameters.pipeline_trigger_type",
+                                        "type": "Expression"
+                                    },
+                                    "table_config": {
+                                        "value": "@activity('Get Config Information').output.value",
+                                        "type": "Expression"
+                                    },
+                                    "sequence_number": {
+                                        "value": "@item().sequence_number",
+                                        "type": "Expression"
+                                    }
+                                }
+                            },
+                            "externalReferences": {
+                                "connection": "a8ef69da-6aa3-43bc-9b68-4300688dc0bd"
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id": {
+                "type": "string"
+            },
+            "pipeline_name": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_time": {
+                "type": "string"
+            },
+            "pipeline_trigger_type": {
+                "type": "string"
+            }
+        },
+        "lastModifiedByObjectId": "9bf2ac9e-1d69-4d64-8784-ed0fdebe0b26",
+        "lastPublishTime": "2025-09-29T03:31:49Z"
+    }
+}

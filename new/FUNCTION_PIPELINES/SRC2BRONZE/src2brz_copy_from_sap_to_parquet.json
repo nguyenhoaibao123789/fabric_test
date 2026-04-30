@@ -1,0 +1,184 @@
+{
+    "name": "src2brz_copy_from_sap_to_parquet",
+    "objectId": "00000000-0000-0000-0000-000000000003",
+    "properties": {
+        "activities": [
+            {
+                "name": "Copy From SAP to Parquet",
+                "type": "Copy",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "SapTableSource",
+                        "tableFields": "*",
+                        "additionalColumns": [
+                            {
+                                "name": "pipeline_id",
+                                "value": { "value": "@pipeline().parameters.pipeline_id", "type": "Expression" }
+                            },
+                            {
+                                "name": "pipeline_name",
+                                "value": { "value": "@pipeline().parameters.pipeline_name", "type": "Expression" }
+                            },
+                            {
+                                "name": "pipeline_run_id",
+                                "value": { "value": "@pipeline().parameters.pipeline_run_id", "type": "Expression" }
+                            },
+                            {
+                                "name": "pipeline_trigger_id",
+                                "value": { "value": "@pipeline().parameters.pipeline_trigger_id", "type": "Expression" }
+                            },
+                            {
+                                "name": "pipeline_trigger_time",
+                                "value": { "value": "@pipeline().parameters.pipeline_trigger_time", "type": "Expression" }
+                            },
+                            {
+                                "name": "pipeline_trigger_type",
+                                "value": { "value": "@pipeline().parameters.pipeline_trigger_type", "type": "Expression" }
+                            }
+                        ],
+                        "datasetSettings": {
+                            "annotations": [],
+                            "linkedService": {
+                                "name": "MDF_SAP_DEV_001",
+                                "properties": {
+                                    "annotations": [],
+                                    "type": "SapTable",
+                                    "typeProperties": {}
+                                }
+                            },
+                            "type": "SapTableResource",
+                            "typeProperties": {
+                                "tableName": {
+                                    "value": "@pipeline().parameters.sourcetablename",
+                                    "type": "Expression"
+                                }
+                            },
+                            "schema": []
+                        }
+                    },
+                    "sink": {
+                        "type": "ParquetSink",
+                        "storeSettings": {
+                            "type": "AzureBlobStorageWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "ParquetWriteSettings",
+                            "enableVertiParquet": true
+                        },
+                        "datasetSettings": {
+                            "annotations": [],
+                            "linkedService": {
+                                "name": "MDF_LAKEHOUSE_DEV_001",
+                                "properties": {
+                                    "annotations": [],
+                                    "type": "Lakehouse",
+                                    "typeProperties": {
+                                        "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                        "artifactId": "e638c447-1201-4ad5-b5c0-b51f406ec2ec",
+                                        "rootFolder": "Files"
+                                    }
+                                }
+                            },
+                            "type": "Parquet",
+                            "typeProperties": {
+                                "location": {
+                                    "type": "LakehouseLocation",
+                                    "fileName": {
+                                        "value": "@{pipeline().parameters.sourcetablename}.parquet",
+                                        "type": "Expression"
+                                    },
+                                    "folderPath": {
+                                        "value": "@{pipeline().parameters.container}/@{pipeline().parameters.datasubject}/@{pipeline().parameters.classification}/@{pipeline().parameters.sourcesystem}/@{pipeline().parameters.sourceschema}/@{pipeline().parameters.tablename}/@{pipeline().parameters.ingest_channel}/@{formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')}",
+                                        "type": "Expression"
+                                    }
+                                },
+                                "compressionCodec": "none"
+                            },
+                            "schema": []
+                        }
+                    },
+                    "enableStaging": false
+                }
+            },
+            {
+                "name": "Update Load Status",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Copy From SAP to Parquet",
+                        "dependencyConditions": [ "Succeeded" ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "storedProcedureName": "[mdf_platform_orchestration].[update_load_status]",
+                    "storedProcedureParameters": {
+                        "last_ingest_partition": {
+                            "value": { "value": "@{formatDateTime(pipeline().parameters.pipeline_trigger_time,'yyyy-MM-dd-HH')}", "type": "Expression" },
+                            "type": "String"
+                        },
+                        "layer":                { "value": { "value": "@pipeline().parameters.layer",                "type": "Expression" }, "type": "String" },
+                        "pipeline_id":          { "value": { "value": "@pipeline().parameters.pipeline_id",          "type": "Expression" }, "type": "String" },
+                        "pipeline_name":        { "value": { "value": "@pipeline().parameters.pipeline_name",        "type": "Expression" }, "type": "String" },
+                        "pipeline_run_id":      { "value": { "value": "@pipeline().parameters.pipeline_run_id",      "type": "Expression" }, "type": "String" },
+                        "pipeline_trigger_id":  { "value": { "value": "@pipeline().parameters.pipeline_trigger_id",  "type": "Expression" }, "type": "String" },
+                        "pipeline_trigger_time":{ "value": { "value": "@pipeline().parameters.pipeline_trigger_time","type": "Expression" }, "type": "String" },
+                        "pipeline_trigger_type":{ "value": { "value": "@pipeline().parameters.pipeline_trigger_type","type": "Expression" }, "type": "String" },
+                        "table_id":             { "value": { "value": "@pipeline().parameters.table_id",             "type": "Expression" }, "type": "String" }
+                    }
+                },
+                "linkedService": {
+                    "name": "MDF_WAREHOUSE_DEV_001",
+                    "properties": {
+                        "annotations": [],
+                        "type": "DataWarehouse",
+                        "typeProperties": {
+                            "endpoint": "nv3l45p7irxunojdrwsud5otge-isco3hrff5zuzpeqnjwvvo6u5i.datawarehouse.fabric.microsoft.com",
+                            "artifactId": "c3761e0c-3b74-4d36-8fe6-69d703178d65",
+                            "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                        }
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id":           { "type": "string" },
+            "pipeline_name":         { "type": "string" },
+            "pipeline_run_id":       { "type": "string" },
+            "pipeline_trigger_id":   { "type": "string" },
+            "pipeline_trigger_time": { "type": "string" },
+            "pipeline_trigger_type": { "type": "string" },
+            "container":             { "type": "string" },
+            "datasubject":           { "type": "string" },
+            "classification":        { "type": "string" },
+            "sourcesystem":          { "type": "string" },
+            "sourceschema":          { "type": "string" },
+            "sourceschemaname":      { "type": "string" },
+            "sourcetablename":       { "type": "string" },
+            "tablename":             { "type": "string" },
+            "table_id":              { "type": "string" },
+            "ingest_channel":        { "type": "string" },
+            "latest_load_dt":        { "type": "string" },
+            "ingest_partition":      { "type": "string" },
+            "criteria_columns":      { "type": "string" },
+            "full_refresh_flag":     { "type": "string" },
+            "layer":                 { "type": "string" }
+        },
+        "lastModifiedByObjectId": "9bf2ac9e-1d69-4d64-8784-ed0fdebe0b26",
+        "lastPublishTime": "2026-04-20T00:00:00Z"
+    }
+}

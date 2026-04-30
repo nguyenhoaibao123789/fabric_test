@@ -1,0 +1,57 @@
+{
+    "name": "src2brz_financial_iccpdatabase_prod_wf",
+    "objectId": "1a04b8e6-d7bc-44b2-a96c-aed516b68916",
+    "properties": {
+        "activities": [
+            {
+                "name": "Invoke coordinator",
+                "type": "InvokePipeline",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "waitOnCompletion": true,
+                    "operationType": "InvokeFabricPipeline",
+                    "pipelineId": "a81d1bc4-702f-4c94-8711-5c7b37546416",
+                    "workspaceId": "d81eba7e-0f95-4721-a677-914b6cc88bb5",
+                    "parameters": {
+                        "pipeline_id": {
+                            "value": "@pipeline().Pipeline",
+                            "type": "Expression"
+                        },
+                        "pipeline_name": {
+                            "value": "@pipeline().PipelineName",
+                            "type": "Expression"
+                        },
+                        "pipeline_run_id": {
+                            "value": "@pipeline().RunId",
+                            "type": "Expression"
+                        },
+                        "pipeline_trigger_id": {
+                            "value": "@pipeline().TriggerId",
+                            "type": "Expression"
+                        },
+                        "pipeline_trigger_time": {
+                            "value": "@pipeline().TriggerTime",
+                            "type": "Expression"
+                        },
+                        "pipeline_trigger_type": {
+                            "value": "@pipeline().TriggerType",
+                            "type": "Expression"
+                        }
+                    }
+                },
+                "externalReferences": {
+                    "connection": "4c68d8f5-4533-4d83-a35e-b5817979f2d2"
+                }
+            }
+        ],
+        "lastModifiedByObjectId": "a1c35b63-faa1-4b34-b2a1-c3dd5afd11f3",
+        "lastPublishTime": "2026-04-21T09:20:46Z"
+    }
+}

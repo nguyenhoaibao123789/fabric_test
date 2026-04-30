@@ -1,0 +1,200 @@
+{
+    "name": "coordinator",
+    "objectId": "bfdaa752-ed98-4902-bbfa-7de4177bbefd",
+    "properties": {
+        "activities": [
+            {
+                "name": "SwitchByLayer",
+                "type": "Switch",
+                "dependsOn": [],
+                "typeProperties": {
+                    "on": {
+                        "value": "@split(pipeline().parameters.pipeline_name,'_')[0]",
+                        "type": "Expression"
+                    },
+                    "cases": [
+                        {
+                            "value": "src2brz",
+                            "activities": [
+                                {
+                                    "name": "InvokeCallTosrc2brzGetConfig",
+                                    "type": "InvokePipeline",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "typeProperties": {
+                                        "waitOnCompletion": true,
+                                        "operationType": "InvokeFabricPipeline",
+                                        "pipelineId": "90da4937-c6e7-49b4-8735-bf60869fdd40",
+                                        "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                        "parameters": {
+                                            "pipeline_id": {
+                                                "value": "@pipeline().parameters.pipeline_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_name": {
+                                                "value": "@pipeline().parameters.pipeline_name",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_run_id": {
+                                                "value": "@pipeline().parameters.pipeline_run_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_id": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_time": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_time",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_type": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_type",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    },
+                                    "externalReferences": {
+                                        "connection": "a8ef69da-6aa3-43bc-9b68-4300688dc0bd"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "value": "bronze2silver",
+                            "activities": [
+                                {
+                                    "name": "InvokeCallToBronze2SilverGetConfig",
+                                    "type": "InvokePipeline",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "typeProperties": {
+                                        "waitOnCompletion": true,
+                                        "operationType": "InvokeFabricPipeline",
+                                        "pipelineId": "ac8913d1-ce73-4a76-adca-2663858f287c",
+                                        "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                        "parameters": {
+                                            "pipeline_id": {
+                                                "value": "@pipeline().parameters.pipeline_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_name": {
+                                                "value": "@pipeline().parameters.pipeline_name",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_run_id": {
+                                                "value": "@pipeline().parameters.pipeline_run_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_id": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_time": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_time",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_type": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_type",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    },
+                                    "externalReferences": {
+                                        "connection": "a8ef69da-6aa3-43bc-9b68-4300688dc0bd"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "value": "silver2gold",
+                            "activities": [
+                                {
+                                    "name": "InvokeCallToSilver2GoldGetConfig",
+                                    "type": "InvokePipeline",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "typeProperties": {
+                                        "waitOnCompletion": true,
+                                        "operationType": "InvokeFabricPipeline",
+                                        "pipelineId": "7119f6f8-d47f-4153-be55-06736ca5a76f",
+                                        "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea",
+                                        "parameters": {
+                                            "pipeline_id": {
+                                                "value": "@pipeline().parameters.pipeline_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_name": {
+                                                "value": "@pipeline().parameters.pipeline_name",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_run_id": {
+                                                "value": "@pipeline().parameters.pipeline_run_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_id": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_id",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_time": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_time",
+                                                "type": "Expression"
+                                            },
+                                            "pipeline_trigger_type": {
+                                                "value": "@pipeline().parameters.pipeline_trigger_type",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    },
+                                    "externalReferences": {
+                                        "connection": "a8ef69da-6aa3-43bc-9b68-4300688dc0bd"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "defaultActivities": []
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_id": {
+                "type": "string"
+            },
+            "pipeline_name": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_id": {
+                "type": "string"
+            },
+            "pipeline_trigger_time": {
+                "type": "string"
+            },
+            "pipeline_trigger_type": {
+                "type": "string"
+            }
+        },
+        "lastModifiedByObjectId": "9bf2ac9e-1d69-4d64-8784-ed0fdebe0b26",
+        "lastPublishTime": "2025-09-29T03:34:32Z"
+    }
+}
