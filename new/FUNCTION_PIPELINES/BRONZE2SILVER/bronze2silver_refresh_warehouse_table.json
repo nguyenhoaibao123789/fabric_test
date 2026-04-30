@@ -275,9 +275,9 @@
                                         },
                                         "type": "string"
                                     },
-                                    "file_type": {
+                                    "bronze_file_type": {
                                         "value": {
-                                            "value": "@pipeline().parameters.file_type",
+                                            "value": "@pipeline().parameters.bronze_file_type",
                                             "type": "Expression"
                                         },
                                         "type": "string"
@@ -519,7 +519,7 @@
             "layer": {
                 "type": "string"
             },
-            "file_type": {
+            "bronze_file_type": {
                 "type": "string"
             }
         },

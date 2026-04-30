@@ -1,9 +1,19 @@
 /* ============================================================
-   EXAMPLE INSERT — elt_table_config
-   Two paired rows: src2brz (id=23) + bronze2silver (id=54)
-   for warehouse.coldroomtemperatures via SQL Server on-prem
+   LEGACY REFERENCE — elt_table_config paired example
+   Original location: STORED_PROCEDURE\elt_table_config_example_insert.sql
+   Moved here so STORED_PROCEDURE\ stays DDL-only.
+
+   These two rows (table_id 23 + 54) are already included in
+   01_seed_elt_table_config.sql. This file is kept as a
+   human-readable reference showing how paired src2brz / b2s
+   rows are structured with inline comments.
    ============================================================ */
 
+/* ── src2brz row ──────────────────────────────────────────────
+   Reads from on-prem SQL Server via gateway.
+   Writes Parquet to Lakehouse Files/bronze/...
+   ref_table_id = NULL (no upstream dependency)
+   ──────────────────────────────────────────────────────────── */
 INSERT INTO [mdf_platform_orchestration].[elt_table_config] (
     [table_id], [datasubject], [classification], [sourcesystem],
     [sourceschema], [sourceschemaname], [sourcetablename], [tablename],
@@ -15,11 +25,6 @@ INSERT INTO [mdf_platform_orchestration].[elt_table_config] (
     [criteria_columns], [full_refresh_flag]
 )
 VALUES
-/* ── src2brz row ──────────────────────────────────────────────
-   Reads from on-prem SQL Server via gateway.
-   Writes Parquet to Lakehouse Files/bronze/...
-   ref_table_id = NULL (no upstream dependency)
-   ──────────────────────────────────────────────────────────────── */
 (
     23,                         -- table_id
     'warehouse',                -- datasubject
@@ -31,9 +36,9 @@ VALUES
     'coldroomtemperatures',     -- tablename           (bronze folder leaf)
     NULL,                       -- job_group
     'ingest_channel=dfp',       -- ingest_channel
-    'src2brz',               -- layer
+    'src2brz',                  -- layer
     'bronze',                   -- container
-    10,                         -- sequence_number        (runs in batch 1)
+    10,                         -- sequence_number     (runs in batch 1)
     'daily',                    -- cycle
     0,                          -- process_id
     NULL,                       -- ref_table_id        (NULL for src2brz)
@@ -49,11 +54,11 @@ VALUES
     'Y'                         -- full_refresh_flag   (Y = TRUNCATE+INSERT)
 ),
 
-/* ── bronze2silver row ───────────────────────────────────────────
+/* ── bronze2silver row ────────────────────────────────────────
    Reads from the Parquet written by the src2brz row above.
    Writes to [silver].[coldroomtemperatures] in Fabric Warehouse.
    ref_table_id = 23  (links back to the src2brz row)
-   ──────────────────────────────────────────────────────────────── */
+   ──────────────────────────────────────────────────────────── */
 (
     54,                         -- table_id
     'warehouse',                -- datasubject
@@ -67,7 +72,7 @@ VALUES
     'ingest_channel=dfp',       -- ingest_channel
     'bronze2silver',            -- layer
     'silver',                   -- container
-    10,                         -- sequence_number        (same batch as src2brz — both seq 1)
+    10,                         -- sequence_number
     'daily',                    -- cycle
     0,                          -- process_id
     23,                         -- ref_table_id        (→ src2brz row id=23)
@@ -82,3 +87,4 @@ VALUES
     NULL,                       -- criteria_columns    (no SCD2 key — full refresh)
     'Y'                         -- full_refresh_flag   (Y = TRUNCATE+INSERT)
 );
+GO

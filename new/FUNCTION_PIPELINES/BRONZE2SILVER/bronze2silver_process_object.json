@@ -137,8 +137,8 @@
                                         "value": "@item().layer",
                                         "type": "Expression"
                                     },
-                                    "file_type": {
-                                        "value": "@item().file_type",
+                                    "bronze_file_type": {
+                                        "value": "@item().bronze_file_type",
                                         "type": "Expression"
                                     }
                                 }

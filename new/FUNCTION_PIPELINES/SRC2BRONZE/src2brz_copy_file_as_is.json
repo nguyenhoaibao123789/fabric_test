@@ -291,7 +291,7 @@
             "custom_source_path": {
                 "type": "string"
             },
-            "file_type": {
+            "bronze_file_type": {
                 "type": "string"
             },
             "file_pattern": {
