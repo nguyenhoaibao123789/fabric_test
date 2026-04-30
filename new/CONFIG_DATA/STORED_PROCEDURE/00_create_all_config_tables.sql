@@ -34,9 +34,9 @@ BEGIN
     CREATE TABLE [mdf_platform_orchestration].[elt_table_config] (
 
         [table_id]             INT             NOT NULL,
-        [datasubject]          VARCHAR(100)    NOT NULL,   -- application | sales | warehouse | purchasing | financial
-        [classification]       VARCHAR(50)     NOT NULL,   -- confidential | regulated | restricted | sensitive
-        [sourcesystem]         VARCHAR(100)    NOT NULL,   -- sqlvm | sharepoint | sap | sftp | api
+        [datasubject]          VARCHAR(100)    NOT NULL,   -- e.g. iccp-finance | pdo-finance | pdo-sales-marketing | sppi-operations
+        [classification]       VARCHAR(50)     NOT NULL,   -- restricted | confidential | internal | public
+        [sourcesystem]         VARCHAR(100)    NOT NULL,   -- sqlvm | sharepoint | sap | awsrds | sftp | api
         [sourceschema]         VARCHAR(100)    NULL,
         [sourceschemaname]     VARCHAR(100)    NULL,
         [sourcetablename]      VARCHAR(200)    NULL,
@@ -49,7 +49,7 @@ BEGIN
         [cycle]                VARCHAR(50)     NULL,       -- daily | hourly | manual
         [process_id]           INT             NULL,
         [ref_table_id]         INT             NULL,       -- FK → src2brz row; NULL for src2brz rows
-        [bronze_file_format]   VARCHAR(100)    NOT NULL,   -- parquet_none_header | file_as_is | sharepoint_list | sap_table
+        [bronze_file_format]   VARCHAR(100)    NOT NULL,   -- sql_table | excel | csv | sharepoint_list | sap_table | rds_table
         [bronze_file_type]     VARCHAR(50)     NULL,       -- parquet | csv | json | xml | excel (pandas reader for bronze2silver)
         [file_pattern]         VARCHAR(200)    NULL,
         [custom_source_path]   VARCHAR(500)    NULL,
@@ -68,7 +68,7 @@ GO
 
 
 -- ── 2. elt_schema_config ───────────────────────────────────────────────────────
--- Column-level mapping for DB sources (parquet_none_header).
+-- Column-level mapping for DB sources (sql_table / sap_table / rds_table).
 -- src2brz uses this to build TabularTranslator JSON.
 -- bronze2silver Cell 4b uses this to rename and cast columns.
 IF OBJECT_ID(N'[mdf_platform_orchestration].[elt_schema_config]', 'U') IS NULL

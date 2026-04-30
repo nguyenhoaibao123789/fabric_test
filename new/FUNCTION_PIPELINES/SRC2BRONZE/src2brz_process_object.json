@@ -48,7 +48,7 @@
                                 },
                                 "cases": [
                                     {
-                                        "value": "parquet_none_header",
+                                        "value": "sql_table",
                                         "activities": [
                                             {
                                                 "name": "Invoke copy from sql to parquet",
@@ -74,23 +74,114 @@
                                         ]
                                     },
                                     {
-                                        "value": "csv",
+                                        "value": "excel",
                                         "activities": [
                                             {
-                                                "name": "Wait2",
-                                                "type": "Wait",
+                                                "name": "Invoke copy file as is (excel)",
+                                                "type": "InvokePipeline",
                                                 "dependsOn": [],
+                                                "policy": {
+                                                    "timeout": "0.12:00:00",
+                                                    "retry": 0,
+                                                    "retryIntervalInSeconds": 30,
+                                                    "secureOutput": false,
+                                                    "secureInput": false
+                                                },
                                                 "typeProperties": {
-                                                    "waitTimeInSeconds": 1
+                                                    "waitOnCompletion": true,
+                                                    "operationType": "InvokeFabricPipeline",
+                                                    "pipelineId": "00000000-0000-0000-0000-000000000001",
+                                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                                },
+                                                "externalReferences": {
+                                                    "connection": "4c68d8f5-4533-4d83-a35e-b5817979f2d2"
                                                 }
                                             }
                                         ]
                                     },
                                     {
-                                        "value": "excel",
+                                        "value": "csv",
                                         "activities": [
                                             {
-                                                "name": "Wait3",
+                                                "name": "Invoke copy file as is (csv)",
+                                                "type": "InvokePipeline",
+                                                "dependsOn": [],
+                                                "policy": {
+                                                    "timeout": "0.12:00:00",
+                                                    "retry": 0,
+                                                    "retryIntervalInSeconds": 30,
+                                                    "secureOutput": false,
+                                                    "secureInput": false
+                                                },
+                                                "typeProperties": {
+                                                    "waitOnCompletion": true,
+                                                    "operationType": "InvokeFabricPipeline",
+                                                    "pipelineId": "00000000-0000-0000-0000-000000000001",
+                                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                                },
+                                                "externalReferences": {
+                                                    "connection": "4c68d8f5-4533-4d83-a35e-b5817979f2d2"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "value": "sharepoint_list",
+                                        "activities": [
+                                            {
+                                                "name": "Invoke copy sharepoint list to parquet",
+                                                "type": "InvokePipeline",
+                                                "dependsOn": [],
+                                                "policy": {
+                                                    "timeout": "0.12:00:00",
+                                                    "retry": 0,
+                                                    "retryIntervalInSeconds": 30,
+                                                    "secureOutput": false,
+                                                    "secureInput": false
+                                                },
+                                                "typeProperties": {
+                                                    "waitOnCompletion": true,
+                                                    "operationType": "InvokeFabricPipeline",
+                                                    "pipelineId": "00000000-0000-0000-0000-000000000002",
+                                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                                },
+                                                "externalReferences": {
+                                                    "connection": "4c68d8f5-4533-4d83-a35e-b5817979f2d2"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "value": "sap_table",
+                                        "activities": [
+                                            {
+                                                "name": "Invoke copy from sap to parquet",
+                                                "type": "InvokePipeline",
+                                                "dependsOn": [],
+                                                "policy": {
+                                                    "timeout": "0.12:00:00",
+                                                    "retry": 0,
+                                                    "retryIntervalInSeconds": 30,
+                                                    "secureOutput": false,
+                                                    "secureInput": false
+                                                },
+                                                "typeProperties": {
+                                                    "waitOnCompletion": true,
+                                                    "operationType": "InvokeFabricPipeline",
+                                                    "pipelineId": "00000000-0000-0000-0000-000000000003",
+                                                    "workspaceId": "9eed8444-2f25-4c73-bc90-6a6d5abbd4ea"
+                                                },
+                                                "externalReferences": {
+                                                    "connection": "4c68d8f5-4533-4d83-a35e-b5817979f2d2"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "value": "rds_table",
+                                        "activities": [
+                                            {
+                                                "name": "Wait rds_table placeholder",
                                                 "type": "Wait",
                                                 "dependsOn": [],
                                                 "typeProperties": {

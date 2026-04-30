@@ -32,7 +32,7 @@ FROM [mdf_platform_orchestration].[elt_table_config]
 GROUP BY [bronze_file_format]
 ORDER BY [bronze_file_format];
 -- Expected: at least one row each for
---   file_as_is, parquet_none_header, sap_table, sharepoint_list
+--   excel, csv, sharepoint_list, sap_table, rds_table (sql_table when DB sources added)
 GO
 
 

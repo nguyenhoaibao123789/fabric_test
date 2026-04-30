@@ -11,8 +11,8 @@ BEGIN
         [table_id]             INT             NOT NULL,   -- surrogate key; assign manually per source row
 
         -- ── Source location ────────────────────────────────────────
-        [datasubject]          VARCHAR(100)    NOT NULL,   -- e.g. finance, warehouse, sales
-        [classification]       VARCHAR(50)     NOT NULL,   -- confidential | regulated | restricted | sensitive
+        [datasubject]          VARCHAR(100)    NOT NULL,   -- e.g. iccp-finance | pdo-finance | pdo-sales-marketing | sppi-operations
+        [classification]       VARCHAR(50)     NOT NULL,   -- restricted | confidential | internal | public
         [sourcesystem]         VARCHAR(100)    NOT NULL,   -- e.g. sqlvm, sharepoint, sap
         [sourceschema]         VARCHAR(100)    NULL,        -- folder segment in bronze path
         [sourceschemaname]     VARCHAR(100)    NULL,        -- schema name passed to SQL query (DB sources only)
@@ -30,13 +30,12 @@ BEGIN
         [ref_table_id]         INT             NULL,        -- FK → src2brz row; set for bronze2silver+ rows; NULL for src2brz
 
         -- ── Routing (Switch discriminator) ────────────────────────
-        [bronze_file_format]   VARCHAR(100)    NOT NULL,   -- parquet_none_header | file_as_is | sharepoint_list | sap_table
-                                                            -- | csv | parquet | json | excel
+        [bronze_file_format]   VARCHAR(100)    NOT NULL,   -- sql_table | excel | csv | sharepoint_list | sap_table | rds_table
 
         -- ── File source config ────────────────────────────────────
         [bronze_file_type]     VARCHAR(50)     NULL,        -- parquet | csv | json | xml | excel — pandas reader for bronze2silver
         [file_pattern]         VARCHAR(200)    NULL,        -- wildcard for SharePoint doc lib (e.g. fct_sales* or exact filename)
-        [custom_source_path]   VARCHAR(500)    NULL,        -- SharePoint site URL (file_as_is / sharepoint_list) or landing folder
+        [custom_source_path]   VARCHAR(500)    NULL,        -- SharePoint site URL (excel | csv | sharepoint_list sources) or landing folder
         [custom_table_name]    VARCHAR(200)    NULL,        -- SharePoint list ID (sharepoint_list sources only)
 
         -- ── Watermark ──────────────────────────────────────────────

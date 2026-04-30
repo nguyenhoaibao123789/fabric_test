@@ -1,2 +1,9 @@
 table_id,datasubject,classification,sourcesystem,sourceschema,sourceschemaname,sourcetablename,tablename,job_group,ingest_channel,layer,container,sequence_number,cycle,process_id,ref_table_id,bronze_file_format,bronze_file_type,file_pattern,custom_source_path,custom_table_name,ingest_partition,ref_ingest_partition,last_loaded_dt,criteria_columns,full_refresh_flag
-1,financial,restricted,iccpdatabase,sales,sales,orders,orders,NULL,ingest_channel=dfp,src2brz,bronze,10,daily,0,NULL,parquet_none_header,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,Y
+1,iccp-finance,restricted,sharepoint,finance,,ICCP_IS_Dimension,iccp_income_statement,,ingest_channel=dfp,src2brz,bronze,10,daily,0,,excel,,PDO Income Statement Dimension.xlsx,https://iccpgroup.sharepoint.com/sites/ICCPFinancialDataReports/Shared Documents/Financial Statements/PDO/FS Maintenance Files,,,,,, Y
+2,pdo-sales-marketing,confidential,sharepoint,sales,,CDO Satisfaction Monitoring,pdo_csat_cdo,,ingest_channel=dfp,src2brz,bronze,10,daily,0,,sharepoint_list,,,https://iccpgroup.sharepoint.com/sites/PDOCustomerSatisfaction,e58991ff-9ccc-416d-8562-a83b969ef7a0,,,,, Y
+3,pdo-finance,restricted,sap,finance,,PDO_Income_Statement_Forecast_Final,pdo_income_statement_forecast,,ingest_channel=dfp,src2brz,bronze,10,daily,0,,sap_table,,,,,,,,,Y
+4,sppi-operations,internal,awsrds,operations,,Tickets Monitoring,sppi_service_tickets,,ingest_channel=dfp,src2brz,bronze,10,daily,0,,rds_table,,,,,,,,,N
+101,iccp-finance,restricted,sharepoint,finance,,ICCP_IS_Dimension,iccp_income_statement,,ingest_channel=dfp,bronze2silver,silver,10,daily,0,1,excel,excel,,,,,,,, Y
+102,pdo-sales-marketing,confidential,sharepoint,sales,,CDO Satisfaction Monitoring,pdo_csat_cdo,,ingest_channel=dfp,bronze2silver,silver,10,daily,0,2,sharepoint_list,csv,,,,,,,, Y
+103,pdo-finance,restricted,sap,finance,,PDO_Income_Statement_Forecast_Final,pdo_income_statement_forecast,,ingest_channel=dfp,bronze2silver,silver,10,daily,0,3,sap_table,parquet,,,,,,,, Y
+104,sppi-operations,internal,awsrds,operations,,Tickets Monitoring,sppi_service_tickets,,ingest_channel=dfp,bronze2silver,silver,10,daily,0,4,rds_table,parquet,,,,,,,, N

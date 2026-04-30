@@ -1,7 +1,7 @@
 /* ============================================================
    EXAMPLE INSERT — elt_table_config
-   Two paired rows: src2brz (id=23) + bronze2silver (id=54)
-   for warehouse.coldroomtemperatures via SQL Server on-prem
+   Two paired rows: src2brz (id=1) + bronze2silver (id=101)
+   for iccp-finance.iccp_income_statement via SharePoint Folder (Excel)
    ============================================================ */
 
 INSERT INTO [mdf_platform_orchestration].[elt_table_config] (
@@ -16,69 +16,70 @@ INSERT INTO [mdf_platform_orchestration].[elt_table_config] (
 )
 VALUES
 /* ── src2brz row ──────────────────────────────────────────────
-   Reads from on-prem SQL Server via gateway.
-   Writes Parquet to Lakehouse Files/bronze/...
+   Reads Excel file from SharePoint Folder via MDF_SHAREPOINT_DEV_001.
+   Copies file as-is to Lakehouse Files/bronze/...
    ref_table_id = NULL (no upstream dependency)
    ──────────────────────────────────────────────────────────────── */
 (
-    23,                         -- table_id
-    'warehouse',                -- datasubject
-    'restricted',               -- classification
-    'sqlvm',                    -- sourcesystem
-    'warehouse',                -- sourceschema        (bronze folder segment)
-    'warehouse',                -- sourceschemaname    (schema name in SQL query)
-    'coldroomtemperatures',     -- sourcetablename     (source table name)
-    'coldroomtemperatures',     -- tablename           (bronze folder leaf)
-    NULL,                       -- job_group
-    'ingest_channel=dfp',       -- ingest_channel
-    'src2brz',               -- layer
-    'bronze',                   -- container
-    10,                         -- sequence_number        (runs in batch 1)
-    'daily',                    -- cycle
-    0,                          -- process_id
-    NULL,                       -- ref_table_id        (NULL for src2brz)
-    'parquet_none_header',      -- bronze_file_format  (Switch key → copy_from_sql_to_parquet)
-    NULL,                       -- bronze_file_type    (N/A for DB source — no pandas reader needed)
-    NULL,                       -- file_pattern        (N/A for DB source)
-    NULL,                       -- custom_source_path  (N/A for DB source)
-    NULL,                       -- custom_table_name   (N/A for DB source)
-    '2025-09-29-08',            -- ingest_partition    (last successfully loaded partition)
-    NULL,                       -- ref_ingest_partition
-    NULL,                       -- last_loaded_dt
-    NULL,                       -- criteria_columns    (no SCD2 key — full refresh)
-    'Y'                         -- full_refresh_flag   (Y = TRUNCATE+INSERT)
+    1,                              -- table_id
+    'iccp-finance',                 -- datasubject         (domain_businessunit)
+    'restricted',                   -- classification      restricted | confidential | internal | public
+    'sharepoint',                   -- sourcesystem
+    'finance',                      -- sourceschema        (bronze folder segment)
+    NULL,                           -- sourceschemaname    (NULL for file sources)
+    'ICCP_IS_Dimension',            -- sourcetablename     (Power BI / SQL table name)
+    'iccp_income_statement',        -- tablename           (bronze folder leaf + silver target)
+    NULL,                           -- job_group
+    'ingest_channel=dfp',           -- ingest_channel
+    'src2brz',                      -- layer
+    'bronze',                       -- container
+    10,                             -- sequence_number     (runs in batch 1)
+    'daily',                        -- cycle
+    0,                              -- process_id
+    NULL,                           -- ref_table_id        (NULL for src2brz)
+    'excel',                        -- bronze_file_format  (Switch key → copy_file_as_is)
+    NULL,                           -- bronze_file_type    (N/A for src2brz — no pandas reader needed)
+    'PDO Income Statement Dimension.xlsx', -- file_pattern (exact filename or wildcard)
+    'https://iccpgroup.sharepoint.com/sites/ICCPFinancialDataReports/Shared Documents/Financial Statements/PDO/FS Maintenance Files',
+                                    -- custom_source_path  (SharePoint folder URL)
+    NULL,                           -- custom_table_name   (N/A — not a SharePoint list)
+    NULL,                           -- ingest_partition
+    NULL,                           -- ref_ingest_partition
+    NULL,                           -- last_loaded_dt
+    NULL,                           -- criteria_columns    (no SCD2 key — full refresh)
+    'Y'                             -- full_refresh_flag   (Y = TRUNCATE+INSERT)
 ),
 
 /* ── bronze2silver row ───────────────────────────────────────────
-   Reads from the Parquet written by the src2brz row above.
-   Writes to [silver].[coldroomtemperatures] in Fabric Warehouse.
-   ref_table_id = 23  (links back to the src2brz row)
+   Reads the Excel file landed in bronze by the src2brz row above.
+   Writes to [silver].[iccp_income_statement] in Fabric Warehouse.
+   ref_table_id = 1  (links back to the src2brz row)
    ──────────────────────────────────────────────────────────────── */
 (
-    54,                         -- table_id
-    'warehouse',                -- datasubject
-    'restricted',               -- classification
-    'sqlvm',                    -- sourcesystem
-    'warehouse',                -- sourceschema
-    'warehouse',                -- sourceschemaname
-    'coldroomtemperatures',     -- sourcetablename
-    'coldroomtemperatures',     -- tablename           (target: [silver].[coldroomtemperatures])
-    NULL,                       -- job_group
-    'ingest_channel=dfp',       -- ingest_channel
-    'bronze2silver',            -- layer
-    'silver',                   -- container
-    10,                         -- sequence_number        (same batch as src2brz — both seq 1)
-    'daily',                    -- cycle
-    0,                          -- process_id
-    23,                         -- ref_table_id        (→ src2brz row id=23)
-    'parquet_none_header',      -- bronze_file_format  (tells notebook the bronze file is Parquet)
-    'parquet',                  -- bronze_file_type    (pandas reader: pd.read_parquet)
-    NULL,                       -- file_pattern
-    NULL,                       -- custom_source_path
-    NULL,                       -- custom_table_name
-    '2025-08-30-10',            -- ingest_partition    (last partition loaded to silver; B2S watermark)
-    NULL,                       -- ref_ingest_partition
-    NULL,                       -- last_loaded_dt
-    NULL,                       -- criteria_columns    (no SCD2 key — full refresh)
-    'Y'                         -- full_refresh_flag   (Y = TRUNCATE+INSERT)
+    101,                            -- table_id
+    'iccp-finance',                 -- datasubject
+    'restricted',                   -- classification
+    'sharepoint',                   -- sourcesystem
+    'finance',                      -- sourceschema
+    NULL,                           -- sourceschemaname
+    'ICCP_IS_Dimension',            -- sourcetablename
+    'iccp_income_statement',        -- tablename           (target: [silver].[iccp_income_statement])
+    NULL,                           -- job_group
+    'ingest_channel=dfp',           -- ingest_channel
+    'bronze2silver',                -- layer
+    'silver',                       -- container
+    10,                             -- sequence_number
+    'daily',                        -- cycle
+    0,                              -- process_id
+    1,                              -- ref_table_id        (→ src2brz row id=1)
+    'excel',                        -- bronze_file_format  (Switch key → copy_file_as_is)
+    'excel',                        -- bronze_file_type    (pandas reader: pd.read_excel)
+    NULL,                           -- file_pattern
+    NULL,                           -- custom_source_path
+    NULL,                           -- custom_table_name
+    NULL,                           -- ingest_partition
+    NULL,                           -- ref_ingest_partition
+    NULL,                           -- last_loaded_dt
+    NULL,                           -- criteria_columns    (no SCD2 key — full refresh)
+    'Y'                             -- full_refresh_flag   (Y = TRUNCATE+INSERT)
 );

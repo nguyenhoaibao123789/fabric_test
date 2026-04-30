@@ -18,52 +18,50 @@ CREATE TABLE [mdf_platform_orchestration].[elt_table_config] (
     [table_id]              INT              NOT NULL,
 
     -- Routing — coordinator + get_config use these to filter rows
-    [layer]                 VARCHAR(50)      NOT NULL,   -- src2brz | bronze2silver | silver2gold | gold2platinum
-    [datasubject]           VARCHAR(100)     NOT NULL,   -- application | sales | warehouse | purchasing
-    [sequence_number]          INT              NOT NULL,   -- processing wave; lower runs first
-    [stg_file_format]       VARCHAR(50)      NOT NULL,   -- parquet_none_header | csv | parquet | json | excel
-    [cycle]                 VARCHAR(50)      NOT NULL,   -- daily | hourly | manual
+    [layer]                 VARCHAR(max)      NOT NULL,   -- src2brz | bronze2silver | silver2gold | gold2platinum
+    [datasubject]           VARCHAR(max)     NOT NULL,   -- e.g. iccp-finance | pdo-finance | pdo-sales-marketing | sppi-operations
+    [sequence_number]       INT              NOT NULL,   -- processing wave; lower runs first
+    [bronze_file_format]    VARCHAR(max)     NOT NULL,   -- sql_table | excel | csv | sharepoint_list | sap_table | rds_table
+    [cycle]                 VARCHAR(max)      NOT NULL,   -- daily | hourly | manual
 
     -- Source identity
-    [classification]        VARCHAR(50)      NOT NULL,   -- confidential | restricted | sensitive | regulated
-    [sourcesystem]          VARCHAR(100)     NOT NULL,   -- sqlvm | sftp | api …
-    [sourceschema]          VARCHAR(100)     NOT NULL,
-    [sourceschemaname]      VARCHAR(100)     NOT NULL,   -- used in SQL: SELECT * FROM [@sourceschemaname].[@tablename]
-    [sourcetablename]       VARCHAR(200)     NOT NULL,   -- source table / file name
-    [tablename]             VARCHAR(200)     NOT NULL,   -- bronze folder leaf + Warehouse target table name
+    [classification]        VARCHAR(max)      NOT NULL,   -- restricted | confidential | internal | public
+    [sourcesystem]          VARCHAR(max)     NOT NULL,   -- sqlvm | sharepoint | sap | awsrds | sftp | api
+    [sourceschema]          VARCHAR(max)     NULL,
+    [sourceschemaname]      VARCHAR(max)     NULL,       -- used in SQL: SELECT * FROM [@sourceschemaname].[@tablename]
+    [sourcetablename]       VARCHAR(max)     NULL,       -- source table / file name
+    [tablename]             VARCHAR(max)     NOT NULL,   -- bronze folder leaf + Warehouse target table name
 
     -- Path construction (bronze Lakehouse)
-    [container]             VARCHAR(50)      NOT NULL,   -- bronze (src2brz rows)
-    [ingest_channel]        VARCHAR(100)     NOT NULL,   -- subfolder: ingest_channel=dfp
+    [container]             VARCHAR(max)      NULL,       -- bronze | silver | gold
+    [ingest_channel]        VARCHAR(max)     NULL,       -- subfolder: ingest_channel=dfp
 
-    -- File source columns (populated when stg_file_format != parquet_none_header)
-    [custom_source_path]    VARCHAR(500)     NULL,       -- landing zone folder in Lakehouse Files/
-    [file_type]             VARCHAR(50)      NULL,       -- parquet | csv | json | xml | excel → pandas reader
+    -- File source columns (populated for excel | csv | sharepoint_list sources)
+    [custom_source_path]    VARCHAR(max)     NULL,       -- SharePoint site URL or landing folder
+    [bronze_file_type]      VARCHAR(max)      NULL,       -- parquet | csv | json | xml | excel → pandas reader (bronze2silver only)
+    [file_pattern]          VARCHAR(max)     NULL,       -- wildcard for SharePoint doc lib (e.g. fct_sales* or exact filename)
+    [custom_table_name]     VARCHAR(max)     NULL,       -- SharePoint list GUID (sharepoint_list sources only)
 
     -- Watermark — updated by update_load_status SP after each successful load
-    [ingest_partition]      VARCHAR(20)      NULL,       -- last partition written: yyyy-MM-dd-HH
-    [last_loaded_dt]        DATETIME2(7)     NULL,       -- derived from ingest_partition by SP (bronze2silver+)
+    [ingest_partition]      VARCHAR(max)      NULL,       -- last partition written: yyyy-MM-dd-HH
+    [ref_ingest_partition]  VARCHAR(max)      NULL,
+    [last_loaded_dt]        DATETIME2(6)     NULL,       -- derived from ingest_partition by SP (bronze2silver+)
 
     -- SCD2 / merge control (used by bronze2silver notebook)
-    [criteria_columns]      VARCHAR(500)     NULL,       -- comma-separated business key cols for SCD2 merge
-    [full_refresh_flag]     INT              NOT NULL,   -- 1 = TRUNCATE + bulk insert; 0 = SCD2 merge
+    [criteria_columns]      VARCHAR(max)     NULL,       -- comma-separated business key cols for SCD2 merge
+    [full_refresh_flag]     CHAR(1)          NOT NULL,    -- Y = TRUNCATE + bulk insert; N = SCD2 / append
 
-    -- Legacy columns (kept for compatibility)
-    [job_group]             VARCHAR(100)     NULL,
-    [custom_table_name]     VARCHAR(200)     NULL,
-    [stg_file_type]         VARCHAR(50)      NULL,
-    [ref_table_id]          INT              NULL,
-    [process_id]            INT              NOT NULL,
-    [ref_ingest_partition]  VARCHAR(20)      NULL,
-
-    CONSTRAINT [PK_elt_table_config] PRIMARY KEY ([table_id])
+    -- Orchestration
+    [job_group]             VARCHAR(max)     NULL,
+    [ref_table_id]          INT              NULL,       -- FK → src2brz row; NULL for src2brz rows
+    [process_id]            INT              NULL
 );
 GO
 
 
 -- ============================================================
 -- elt_schema_config
--- Column mapping for DB sources (parquet_none_header).
+-- Column mapping for DB sources (sql_table / sap_table / rds_table).
 -- Used by src2brz_copy_from_sql_to_parquet to build the
 -- TabularTranslator JSON for the Copy activity.
 -- ============================================================
@@ -78,8 +76,8 @@ CREATE TABLE [mdf_platform_orchestration].[elt_schema_config] (
     [target_column_name]     VARCHAR(200)     NOT NULL,
     [target_data_type]       VARCHAR(50)      NOT NULL,   -- Parquet type: STRING | INT32 | INT64 | INT96 | DECIMAL | BOOLEAN | BYTE_ARRAY
 
-    CONSTRAINT [PK_elt_schema_config] PRIMARY KEY ([table_id], [source_column_position]),
-    CONSTRAINT [FK_elt_schema_config_table] FOREIGN KEY ([table_id])
+    CONSTRAINT [PK_elt_schema_config_ctc] PRIMARY KEY ([table_id], [source_column_position]),
+    CONSTRAINT [FK_elt_schema_config_table_ctc] FOREIGN KEY ([table_id])
         REFERENCES [mdf_platform_orchestration].[elt_table_config] ([table_id])
 );
 GO

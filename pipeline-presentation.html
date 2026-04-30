@@ -555,7 +555,7 @@ section{min-height:100vh;padding:88px 64px 64px;display:flex;flex-direction:colu
       <div class="path-steps">
         <div class="ps-item"><div class="ps-num">1</div><div><div class="ps-label">Binary Copy (no format conversion)</div>Copies <code style="font-family:var(--mono);font-size:10px">{custom_source_path}/{sourcetablename}</code> → bronze partition<div class="ps-code">bronze/…/{ingest_channel}/{trigger_hour}/</div></div></div>
         <div class="ps-item"><div class="ps-num">2</div><div><div class="ps-label">Update Watermark</div>SP sets <code style="font-family:var(--mono);font-size:10px">ingest_partition = formatDateTime(trigger_time,'yyyy-MM-dd-HH')</code></div></div>
-        <div class="ps-item"><div class="ps-num" style="background:rgba(10,102,71,.12)">✓</div><div><div class="ps-label">file_type carried downstream</div><code style="font-family:var(--mono);font-size:10px">file_type</code> passed all the way to the notebook so the right pandas reader is picked (<code style="font-family:var(--mono);font-size:10px">read_csv</code>, <code style="font-family:var(--mono);font-size:10px">read_json</code>, etc.)</div></div>
+        <div class="ps-item"><div class="ps-num" style="background:rgba(10,102,71,.12)">✓</div><div><div class="ps-label">bronze_file_type carried downstream</div><code style="font-family:var(--mono);font-size:10px">bronze_file_type</code> passed all the way to the notebook so the right pandas reader is picked (<code style="font-family:var(--mono);font-size:10px">read_csv</code>, <code style="font-family:var(--mono);font-size:10px">read_json</code>, etc.)</div></div>
       </div>
       <div class="path-wm">FILE</div>
     </div>
@@ -565,7 +565,7 @@ section{min-height:100vh;padding:88px 64px 64px;display:flex;flex-direction:colu
     <strong style="color:var(--tx)">Config columns consumed here:</strong>&nbsp;
     <code style="font-family:var(--mono);background:var(--amber-bg);color:var(--amber-tx);padding:2px 6px;border-radius:4px">bronze_file_format</code> Switch discriminator &nbsp;·&nbsp;
     <code style="font-family:var(--mono);background:var(--teal-bg);color:var(--teal-tx);padding:2px 6px;border-radius:4px">custom_source_path</code> file landing folder &nbsp;·&nbsp;
-    <code style="font-family:var(--mono);background:var(--teal-bg);color:var(--teal-tx);padding:2px 6px;border-radius:4px">file_type</code> picks the pandas reader at bronze→silver &nbsp;·&nbsp;
+    <code style="font-family:var(--mono);background:var(--teal-bg);color:var(--teal-tx);padding:2px 6px;border-radius:4px">bronze_file_type</code> picks the pandas reader at bronze→silver &nbsp;·&nbsp;
     <code style="font-family:var(--mono);background:var(--purple-bg);color:var(--purple-tx);padding:2px 6px;border-radius:4px">ingest_partition</code> watermark updated after copy
   </div>
   <div class="s-section-num">04</div>
@@ -610,11 +610,11 @@ section{min-height:100vh;padding:88px 64px 64px;display:flex;flex-direction:colu
           </div>
           <div class="nb-cell-body">
 <span class="nb-cmt"># Read bronze file in its native format (no conversion in src2brz)</span>
-<span class="nb-kw">if</span> file_type == <span class="nb-str">"parquet"</span>:
+<span class="nb-kw">if</span> bronze_file_type == <span class="nb-str">"parquet"</span>:
     df = pads.dataset(bronze_local, format=<span class="nb-str">"parquet"</span>).to_table().to_pandas()
-<span class="nb-kw">elif</span> file_type == <span class="nb-str">"csv"</span>:    df = pd.read_csv(files)
-<span class="nb-kw">elif</span> file_type == <span class="nb-str">"json"</span>:   df = pd.read_json(files, lines=<span class="nb-kw">True</span>)
-<span class="nb-kw">elif</span> file_type == <span class="nb-str">"excel"</span>:  df = pd.read_excel(files)
+<span class="nb-kw">elif</span> bronze_file_type == <span class="nb-str">"csv"</span>:    df = pd.read_csv(files)
+<span class="nb-kw">elif</span> bronze_file_type == <span class="nb-str">"json"</span>:   df = pd.read_json(files, lines=<span class="nb-kw">True</span>)
+<span class="nb-kw">elif</span> bronze_file_type == <span class="nb-str">"excel"</span>:  df = pd.read_excel(files)
 
 <span class="nb-cmt"># SCD2 change detection = SHA-256 over business columns only</span>
 df[<span class="nb-str">"row_hash"</span>]   = df[business_cols].apply(_row_to_hash, axis=1)
@@ -697,7 +697,7 @@ WHERE t.[{pk}] IS NULL
         <div class="cfg-group">
           <div class="cfg-group-label">📄 File sources — used when bronze_file_format ≠ parquet_none_header</div>
           <div class="cfg-row"><span class="cfg-col-name teal">custom_source_path</span><div class="cfg-col-body"><div class="cfg-col-desc">Landing zone folder in Lakehouse Files/ where the source file sits before ingestion to bronze.</div><div class="cfg-col-ex">landing/vendor_feeds/acme</div></div></div>
-          <div class="cfg-row"><span class="cfg-col-name teal">file_type</span><div class="cfg-col-body"><div class="cfg-col-desc">Tells the bronze2silver Python notebook which pandas reader to use (<code style="font-family:var(--mono)">read_parquet</code>, <code style="font-family:var(--mono)">read_csv</code>, <code style="font-family:var(--mono)">read_json</code>, <code style="font-family:var(--mono)">read_xml</code>, <code style="font-family:var(--mono)">read_excel</code>). Must match the actual bronze format.</div><div class="cfg-col-ex">parquet, csv, json, xml, excel</div></div></div>
+          <div class="cfg-row"><span class="cfg-col-name teal">bronze_file_type</span><div class="cfg-col-body"><div class="cfg-col-desc">Tells the bronze2silver Python notebook which pandas reader to use (<code style="font-family:var(--mono)">read_parquet</code>, <code style="font-family:var(--mono)">read_csv</code>, <code style="font-family:var(--mono)">read_json</code>, <code style="font-family:var(--mono)">read_xml</code>, <code style="font-family:var(--mono)">read_excel</code>). Must match the actual bronze format.</div><div class="cfg-col-ex">parquet, csv, json, xml, excel</div></div></div>
           <div class="cfg-row"><span class="cfg-col-name teal">sourcetablename</span><div class="cfg-col-body"><div class="cfg-col-desc">For file sources: the file name pattern to pick up from custom_source_path. For DB sources: the source table name passed to the SQL query.</div><div class="cfg-col-ex">orders.csv, transactions_*.parquet</div></div></div>
         </div>
         <!-- Watermark -->
@@ -954,7 +954,7 @@ WHERE t.[{pk}] IS NULL
         <div class="cp derived">datasubject</div>
         <div class="cp derived">sourcesystem</div>
         <div class="cp derived">tablename</div>
-        <div class="cp derived">file_type</div>
+        <div class="cp derived">bronze_file_type</div>
         <div class="cp derived">ingest_partition</div>
         <div class="cp derived">bronze_file_format</div>
         <span style="font-size:9px;color:var(--tx3);margin-top:2px;display:block">from @item() in ForEach</span>
@@ -978,7 +978,7 @@ WHERE t.[{pk}] IS NULL
         <div class="cp">table_id</div>
         <div class="cp">ingest_channel</div>
         <div class="cp">ingest_partition</div>
-        <div class="cp">file_type</div>
+        <div class="cp">bronze_file_type</div>
         <div class="cp">layer</div>
         <div class="cp">full_refresh_flag</div>
       </div>
@@ -1042,7 +1042,7 @@ WHERE t.[{pk}] IS NULL
     <div class="prop-card">
       <div class="prop-icon">📁</div>
       <div class="prop-title">Format Preservation</div>
-      <div class="prop-body">File sources land in bronze exactly as they arrived (csv, json, parquet, xml, excel). The <code style="font-family:var(--mono)">file_type</code> is passed to the Python notebook so the right pandas reader is picked — parsing only happens at the bronze→silver stage.</div>
+      <div class="prop-body">File sources land in bronze exactly as they arrived (csv, json, parquet, xml, excel). The <code style="font-family:var(--mono)">bronze_file_type</code> is passed to the Python notebook so the right pandas reader is picked — parsing only happens at the bronze→silver stage.</div>
       <div class="prop-pill green">Bronze = raw truth</div>
     </div>
     <div class="prop-card">
@@ -1182,11 +1182,11 @@ const TOOLTIPS = {
   'fn-b2s-obj': {
     type:'Process Pipeline', color:'teal',
     title:'bronze2silver_process_object',
-    body:'Same filter-and-dispatch pattern for the silver layer. ForEach with isSequential: true — tables within a sequence run one at a time. Passes file_type downstream.',
+    body:'Same filter-and-dispatch pattern for the silver layer. ForEach with isSequential: true — tables within a sequence run one at a time. Passes bronze_file_type downstream.',
     acts:[
       {icon:'⚡', text:'Filter: @equals(item().sequence_number, pipeline().parameters.sequence_number)'},
       {icon:'🔁', text:'ForEach filtered tables (isSequential: TRUE)'},
-      {icon:'→', text:'Invoke bronze2silver_refresh_warehouse_table with file_type, criteria_columns, full_refresh_flag from @item()'},
+      {icon:'→', text:'Invoke bronze2silver_refresh_warehouse_table with bronze_file_type, criteria_columns, full_refresh_flag from @item()'},
     ]
   },
   'fn-switch': {
@@ -1484,14 +1484,14 @@ output.value: [
 
 <span class="so-h">activity: Get Config Information</span>
 output.value: [
-  { "table_id":1, "tablename":<span class="so-val">"cities"</span>,          "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":2, "tablename":<span class="so-val">"countries"</span>,       "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":3, "tablename":<span class="so-val">"deliverymethods"</span>,  "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":4, "tablename":<span class="so-val">"paymentmethods"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":5, "tablename":<span class="so-val">"people"</span>,           "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":6, "tablename":<span class="so-val">"stateprovinces"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":7, "tablename":<span class="so-val">"systemparameters"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"0", "criteria_columns":"LastEditedWhen" },
-  { "table_id":8, "tablename":<span class="so-val">"transactiontypes"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"1", "criteria_columns":""         }
+  { "table_id":1, "tablename":<span class="so-val">"cities"</span>,          "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":2, "tablename":<span class="so-val">"countries"</span>,       "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":3, "tablename":<span class="so-val">"deliverymethods"</span>,  "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":4, "tablename":<span class="so-val">"paymentmethods"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":5, "tablename":<span class="so-val">"people"</span>,           "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":6, "tablename":<span class="so-val">"stateprovinces"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":7, "tablename":<span class="so-val">"systemparameters"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"N", "criteria_columns":"LastEditedWhen" },
+  { "table_id":8, "tablename":<span class="so-val">"transactiontypes"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"src2brz", "datasubject":"application", "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "ingest_partition":"2026-02-05-09", "full_refresh_flag":"Y", "criteria_columns":""         }
 ]
 
 <span class="so-h">ForEach Sequence Nbr (isSequential: true)</span>
@@ -1514,7 +1514,7 @@ output.value: [
         badge:'Lookup', badgeColor:'blue', name:'Get Config Information  (parallel — no dependsOn)',
         details:[
           {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
-          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[bronze_file_type]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
+          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[bronze_file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
           {l:'firstRowOnly',v:'false — returns full config row array (passed as table_config to process_object)'},
         ]
       },
@@ -1553,14 +1553,14 @@ output.value: [
 
 <span class="so-h">activity: Get Config Information</span>
 output.value: [
-  { "table_id":32, "tablename":<span class="so-val">"cities"</span>,          "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":1,  "ingest_partition":"1900-00-00-00", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":33, "tablename":<span class="so-val">"countries"</span>,       "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":2,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":34, "tablename":<span class="so-val">"deliverymethods"</span>,  "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":3,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":35, "tablename":<span class="so-val">"paymentmethods"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":4,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":36, "tablename":<span class="so-val">"people"</span>,           "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":5,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":37, "tablename":<span class="so-val">"stateprovinces"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":6,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         },
-  { "table_id":38, "tablename":<span class="so-val">"systemparameters"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":7,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"0", "criteria_columns":"LastEditedWhen" },
-  { "table_id":39, "tablename":<span class="so-val">"transactiontypes"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"bronze2silver", "datasubject":"application", "file_type":"parquet", "ref_table_id":8,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"1", "criteria_columns":""         }
+  { "table_id":32, "tablename":<span class="so-val">"cities"</span>,          "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"bronze2silver", "datasubject":"application", "bronze_file_type":"parquet", "ref_table_id":1,  "ingest_partition":"1900-00-00-00", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":33, "tablename":<span class="so-val">"countries"</span>,       "bronze_file_format":"parquet_none_header", "sequence_number":10, "layer":"bronze2silver", "datasubject":"application", "bronze_file_type":"parquet", "ref_table_id":2,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":34, "tablename":<span class="so-val">"deliverymethods"</span>,  "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"bronze2silver", "datasubject":"application", "bronze_file_type":"parquet", "ref_table_id":3,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":35, "tablename":<span class="so-val">"paymentmethods"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":20, "layer":"bronze2silver", "datasubject":"application", "bronze_file_type":"parquet", "ref_table_id":4,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":36, "tablename":<span class="so-val">"people"</span>,           "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"bronze2silver", "datasubject":"application", "bronze_file_type":"parquet", "ref_table_id":5,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":37, "tablename":<span class="so-val">"stateprovinces"</span>,   "bronze_file_format":"parquet_none_header", "sequence_number":30, "layer":"bronze2silver", "datasubject":"application", "bronze_file_type":"parquet", "ref_table_id":6,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"Y", "criteria_columns":""         },
+  { "table_id":38, "tablename":<span class="so-val">"systemparameters"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"bronze2silver", "datasubject":"application", "bronze_file_type":"parquet", "ref_table_id":7,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"N", "criteria_columns":"LastEditedWhen" },
+  { "table_id":39, "tablename":<span class="so-val">"transactiontypes"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":40, "layer":"bronze2silver", "datasubject":"application", "bronze_file_type":"parquet", "ref_table_id":8,  "ingest_partition":"2025-09-29-08", "full_refresh_flag":"Y", "criteria_columns":""         }
 ]
 
 <span class="so-h">ForEach Sequence Nbr (isSequential: true)</span>
@@ -1582,7 +1582,7 @@ output.value: [
         badge:'Lookup', badgeColor:'blue', name:'Get Config Information  (parallel)',
         details:[
           {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
-          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[bronze_file_type]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
+          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[bronze_file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
         ]
       },
       {
@@ -1621,7 +1621,7 @@ output.value: [
         badge:'Lookup', badgeColor:'blue', name:'Get Config Information  (parallel)',
         details:[
           {l:'Source',v:'Fabric Warehouse · MDF_WAREHOUSE_DEV_001'},
-          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[bronze_file_type]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
+          {l:'SQL',v:"SELECT \n     [table_id]\n    ,[datasubject]\n    ,[classification]\n    ,[sourcesystem]\n    ,[sourceschema]\n    ,[sourceschemaname]\n    ,[sourcetablename]\n    ,[tablename]\n    ,[job_group]\n    ,[custom_source_path]\n    ,[ingest_channel]\n    ,[bronze_file_type]\n    ,[custom_table_name]\n    ,[ingest_partition]\n    ,[layer]\n    ,[container]\n    ,[ref_table_id]\n    ,[process_id]\n    ,[sequence_number]\n    ,[bronze_file_format]\n    ,[cycle]\n    ,[ref_ingest_partition]\n    ,[last_loaded_dt]\n    ,[criteria_columns]\n    ,[full_refresh_flag]\n    ,[file_pattern]\nFROM [mdf_platform_orchestration].[elt_table_config]\nWHERE  [layer]      = '@{split(pipeline().parameters.pipeline_name, \"_\")[0]}'\nAND    [datasubject] = '@{split(pipeline().parameters.pipeline_name, \"_\")[1]}'",isCode:true},
         ]
       },
       {
@@ -1711,8 +1711,8 @@ output: {
   "itemsCount": 8,
   "filterCount": 2,
   "value": [
-    { "table_id":1, "tablename":<span class="so-val">"cities"</span>,    "bronze_file_format":"parquet_none_header", "sequence_number":10, "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "full_refresh_flag":"1" },
-    { "table_id":2, "tablename":<span class="so-val">"countries"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":10, "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "full_refresh_flag":"1" }
+    { "table_id":1, "tablename":<span class="so-val">"cities"</span>,    "bronze_file_format":"parquet_none_header", "sequence_number":10, "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "full_refresh_flag":"Y" },
+    { "table_id":2, "tablename":<span class="so-val">"countries"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":10, "sourceschemaname":"application", "ingest_channel":"ingest_channel=dfp", "full_refresh_flag":"Y" }
   ]
 }
 
@@ -1744,14 +1744,14 @@ output: {
           details:[
             {l:'On',v:'@item().bronze_file_format',isCode:true},
             {l:'Case sap_table',v:'InvokePipeline → copy_from_sap_to_parquet  (00000000-...-000003)  SAP RFC/OData path'},
-            {l:'Case csv',v:'InvokePipeline → copy_file_as_is  (00000000-...-000001)  binary copy, passes custom_source_path + file_type'},
+            {l:'Case csv',v:'InvokePipeline → copy_file_as_is  (00000000-...-000001)  binary copy, passes custom_source_path + bronze_file_type'},
             {l:'Case parquet',v:'InvokePipeline → copy_file_as_is  (same placeholder)'},
             {l:'Case json',v:'InvokePipeline → copy_file_as_is  (same placeholder)'},
             {l:'Case excel',v:'InvokePipeline → copy_file_as_is  (same placeholder)'},
             {l:'Case sharepoint_list',v:'InvokePipeline → copy_sharepoint_list_to_parquet  (00000000-...-000002)  Graph API reader, passes custom_source_path + custom_table_name'},
             {l:'Case sap_table',v:'InvokePipeline → copy_from_sap_to_parquet  (00000000-...-000003)  SAP RFC/OData, passes sourcetablename + sourceschemaname'},
             {l:'Default',v:'[] — no-op, unknown format silently skipped'},
-            {l:'File-case extras',v:'custom_source_path = @item().custom_source_path  ·  file_type = @item().file_type  (not sent for DB case)'},
+            {l:'File-case extras',v:'custom_source_path = @item().custom_source_path  ·  bronze_file_type = @item().bronze_file_type  (not sent for DB case)'},
           ]
         }]
       }
@@ -1772,8 +1772,8 @@ output: {
   "itemsCount": 8,
   "filterCount": 2,
   "value": [
-    { "table_id":32, "tablename":<span class="so-val">"cities"</span>,    "bronze_file_format":"parquet_none_header", "sequence_number":10, "file_type":"parquet", "ref_table_id":1,  "ingest_partition":"1900-00-00-00", "criteria_columns":"",             "full_refresh_flag":"1" },
-    { "table_id":33, "tablename":<span class="so-val">"countries"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":10, "file_type":"parquet", "ref_table_id":2,  "ingest_partition":"2025-09-29-08", "criteria_columns":"",             "full_refresh_flag":"1" }
+    { "table_id":32, "tablename":<span class="so-val">"cities"</span>,    "bronze_file_format":"parquet_none_header", "sequence_number":10, "bronze_file_type":"parquet", "ref_table_id":1,  "ingest_partition":"1900-00-00-00", "criteria_columns":"",             "full_refresh_flag":"Y" },
+    { "table_id":33, "tablename":<span class="so-val">"countries"</span>, "bronze_file_format":"parquet_none_header", "sequence_number":10, "bronze_file_type":"parquet", "ref_table_id":2,  "ingest_partition":"2025-09-29-08", "criteria_columns":"",             "full_refresh_flag":"Y" }
   ]
 }
 
@@ -1802,7 +1802,7 @@ output: {
         nested:[{
           badge:'Invoke', badgeColor:'gray', name:'Copy from Bronze to Silver → bronze2silver_refresh_warehouse_table  (73f385fb-...)',
           details:[
-            {l:'Passes',v:'container, datasubject, classification, sourcesystem, sourceschema, sourceschemaname, sourcetablename, tablename, table_id, ingest_channel, ingest_partition, file_type, layer, criteria_columns, full_refresh_flag — all from @item()'},
+            {l:'Passes',v:'container, datasubject, classification, sourcesystem, sourceschema, sourceschemaname, sourcetablename, tablename, table_id, ingest_channel, ingest_partition, bronze_file_type, layer, criteria_columns, full_refresh_flag — all from @item()'},
             {l:'waitOnCompletion',v:'true'},
           ]
         }]
@@ -1828,7 +1828,7 @@ output: {
 @item() = { "table_id":101, "tablename":"fct_sales", <span class="so-val">"bronze_file_format":"file_as_is"</span>, "file_pattern":"fct_sales*", "custom_source_path":"https://iccpgroup.sharepoint.com/sites/Finance/...", ... }
   → matched case "file_as_is"
   → InvokePipeline copy_file_as_is (00000000-...-000001)
-     parameters: { "table_id":"101", "tablename":"fct_sales", "custom_source_path":"https://...", "file_pattern":"fct_sales*", "file_type":"excel", ... }
+     parameters: { "table_id":"101", "tablename":"fct_sales", "custom_source_path":"https://...", "file_pattern":"fct_sales*", "bronze_file_type":"excel", ... }
   → <span class="so-ok">Succeeded  (2s)</span>
 
 @item() = { "table_id":102, "tablename":"csat_responses", <span class="so-val">"bronze_file_format":"sharepoint_list"</span>, "custom_table_name":"a1b2c3d4-...", "custom_source_path":"https://iccpgroup.sharepoint.com/sites/CSAT", ... }
@@ -1863,8 +1863,8 @@ output: {
         details:[
           {l:'Pipeline ID',v:'00000000-0000-0000-0000-000000000001  (placeholder — replace after Fabric deploy)'},
           {l:'Use case',v:'Files already in Lakehouse landing zone. Binary copy — zero format conversion.'},
-          {l:'Extra params',v:'custom_source_path = @item().custom_source_path  ·  file_type = @item().file_type'},
-          {l:'Note',v:'All 4 format cases point to the same pipeline — file_type param tells bronze2silver how to parse it later'},
+          {l:'Extra params',v:'custom_source_path = @item().custom_source_path  ·  bronze_file_type = @item().bronze_file_type'},
+          {l:'Note',v:'All 4 format cases point to the same pipeline — bronze_file_type param tells bronze2silver how to parse it later'},
         ]
       },
       {
@@ -1986,7 +1986,7 @@ output.value: [
             details:[
               {l:'Notebook ID',v:'00000000-0000-0000-0000-000000000002  (placeholder — replace after Fabric deploy)'},
               {l:'ingest_partition param',v:'@item().name  ← folder name for current partition',isCode:true},
-              {l:'All params passed',v:'file_type, datasubject, classification, sourcesystem, sourceschema, tablename, ingest_channel, container, criteria_columns, full_refresh_flag, pipeline_id, pipeline_name, pipeline_run_id, pipeline_trigger_*'},
+              {l:'All params passed',v:'bronze_file_type, datasubject, classification, sourcesystem, sourceschema, tablename, ingest_channel, container, criteria_columns, full_refresh_flag, pipeline_id, pipeline_name, pipeline_run_id, pipeline_trigger_*'},
             ]
           },
           {
@@ -2009,7 +2009,7 @@ output.value: [
       {n:'sourcetablename',t:'string'},{n:'tablename',t:'string'},{n:'table_id',t:'string'},
       {n:'ingest_channel',t:'string'},{n:'latest_load_dt',t:'string'},{n:'ingest_partition',t:'string'},
       {n:'criteria_columns',t:'string'},{n:'full_refresh_flag',t:'string'},{n:'layer',t:'string'},
-      {n:'file_type',t:'string'},
+      {n:'bronze_file_type',t:'string'},
     ]
   },
   'fn-file-copy': {
@@ -2052,7 +2052,7 @@ output: { "resultSets": [] }
           {l:'Sink path',v:"bronze/@{datasubject}/@{classification}/@{sourcesystem}/@{sourceschema}/@{tablename}/@{ingest_channel}/@{formatDateTime(pipeline_trigger_time,'yyyy-MM-dd-HH')}/",isCode:true},
           {l:'Binary mode',v:'Exact byte-for-byte copy — original file format (csv/json/parquet/excel) is preserved unchanged in bronze'},
           {l:'deleteAfterCompletion',v:'false — source file stays in landing zone'},
-          {l:'Note',v:'file_type is carried downstream so bronze2silver picks the right pandas reader (read_parquet / read_csv / read_json / read_xml / read_excel)'},
+          {l:'Note',v:'bronze_file_type is carried downstream so bronze2silver picks the right pandas reader (read_parquet / read_csv / read_json / read_xml / read_excel)'},
         ]
       },
       {
@@ -2072,7 +2072,7 @@ output: { "resultSets": [] }
       {n:'sourcetablename',t:'string'},{n:'tablename',t:'string'},{n:'table_id',t:'string'},
       {n:'ingest_channel',t:'string'},{n:'latest_load_dt',t:'string'},{n:'ingest_partition',t:'string'},
       {n:'criteria_columns',t:'string'},{n:'full_refresh_flag',t:'string'},{n:'layer',t:'string'},
-      {n:'custom_source_path',t:'string'},{n:'file_type',t:'string'},
+      {n:'custom_source_path',t:'string'},{n:'bronze_file_type',t:'string'},
     ]
   },
   'fn-sp-list': {
@@ -2207,10 +2207,10 @@ output: { "resultSets": [] }
     type:'Python Notebook — no PySpark', color:'green',
     sampleOutput:`<span class="so-h">Cell 1  Parameters (injected by pipeline)</span>
 tablename         = <span class="so-val">"cities"</span>
-file_type         = <span class="so-val">"parquet"</span>
+bronze_file_type  = <span class="so-val">"parquet"</span>
 ingest_partition  = <span class="so-val">"2025-09-29-08"</span>
 criteria_columns  = <span class="so-val">""</span>
-full_refresh_flag = <span class="so-val">"1"</span>
+full_refresh_flag = <span class="so-val">"Y"</span>
 datasubject       = "application"  classification = "confidential"
 sourcesystem      = "sqlvm"        sourceschema   = "application"
 pipeline_run_id   = "4f2b8c1a-9d12-4e7b-8c30-1a2b3c4d5e6f"
@@ -2249,7 +2249,7 @@ staging_fqn = [silver].[cities__stg_4f2b8c1a]
 DROP TABLE IF EXISTS → CREATE TABLE → COPY INTO
 output: <span class="so-ok">217 rows loaded  (0.6s)</span>
 
-<span class="so-h">Cell 8  Load mode: full_refresh_flag = "1"  →  TRUNCATE + INSERT</span>
+<span class="so-h">Cell 8  Load mode: full_refresh_flag = "Y"  →  TRUNCATE + INSERT</span>
 TRUNCATE TABLE [silver].[cities]  →  0 rows remaining
 INSERT INTO [silver].[cities] SELECT * FROM [silver].[cities__stg_4f2b8c1a]
 output: <span class="so-ok">217 rows inserted</span>
@@ -2264,7 +2264,7 @@ print: <span class="so-ok">{"status":"SUCCESS","silver":"[silver].[cities]","mod
         badge:'Python', badgeColor:'amber', name:'Cell 1 — Parameters  (injected by Fabric)',
         details:[
           {l:'Purpose',v:'Standard Fabric parameters cell. Values come from the Notebook activity parameters on the calling refresh_warehouse_table pipeline.'},
-          {l:'Code',v:`file_type = ""          # parquet | csv | json | xml | excel
+          {l:'Code',v:`bronze_file_type = ""    # parquet | csv | json | xml | excel
 datasubject = ""; classification = ""; sourcesystem = ""
 sourceschema = ""; tablename = ""; ingest_channel = ""
 ingest_partition = ""   # folder name from ForEach iteration
@@ -2285,7 +2285,7 @@ onelake_lakehouse_id = "e638c447-..."`,isCode:true},
       {
         badge:'Python', badgeColor:'amber', name:'Cell 2 — Read bronze in native format (pandas/pyarrow)',
         details:[
-          {l:'Purpose',v:'Dispatches on file_type to the right pandas/pyarrow reader. Bronze files were NEVER converted in src2brz — the notebook is the first place format matters.'},
+          {l:'Purpose',v:'Dispatches on bronze_file_type to the right pandas/pyarrow reader. Bronze files were NEVER converted in src2brz — the notebook is the first place format matters.'},
           {l:'Code',v:`def read_bronze(path, fmt):
     files = sorted(Path(path).rglob("*"))
     if fmt == "parquet": return pads.dataset(files, format="parquet").to_table().to_pandas()
@@ -2294,7 +2294,7 @@ onelake_lakehouse_id = "e638c447-..."`,isCode:true},
     if fmt == "xml":     return pd.concat([pd.read_xml(f) for f in files])
     if fmt == "excel":   return pd.concat([pd.read_excel(f) for f in files])
 
-df = read_bronze(bronze_local, file_type)`,isCode:true},
+df = read_bronze(bronze_local, bronze_file_type)`,isCode:true},
         ]
       },
       {
@@ -2428,7 +2428,7 @@ print(json.dumps({
       }
     ],
     params:[
-      {n:'file_type',t:'string'},{n:'datasubject',t:'string'},{n:'classification',t:'string'},
+      {n:'bronze_file_type',t:'string'},{n:'datasubject',t:'string'},{n:'classification',t:'string'},
       {n:'sourcesystem',t:'string'},{n:'sourceschema',t:'string'},{n:'tablename',t:'string'},
       {n:'ingest_channel',t:'string'},{n:'ingest_partition',t:'string'},{n:'container',t:'string'},
       {n:'criteria_columns',t:'string'},{n:'full_refresh_flag',t:'string'},

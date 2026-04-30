@@ -1,6 +1,6 @@
 /* ============================================================
    CREATE TABLE  mdf_platform_orchestration.elt_schema_config
-   Column mapping for DB sources (parquet_none_header).
+   Column mapping for DB sources (sql_table / sap_table / rds_table).
    Used by src2brz_copy_from_sql_to_parquet to build the
    TabularTranslator JSON for the Copy activity, and by
    bronze2silver_transform_nbk Cell 4b to rename and cast cols.
